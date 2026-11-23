@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router';
 import { AnimatePresence } from 'motion/react';
 import { btn } from './Button';
@@ -15,13 +15,18 @@ export default function Layout() {
   const [settings, setSettings] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const { pathname } = useLocation();
+  const main = useRef<HTMLElement>(null);
+  // Moving to another page leaves focus on nothing: put it on the new page, past the header.
+  useEffect(() => {
+    if (document.activeElement === document.body) main.current?.focus({ preventScroll: true });
+  }, [pathname]);
   useHotkeys('Everywhere', [{ keys: [','], label: 'Settings', run: () => setSettings(true) }]);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-5 pb-16 sm:px-8">
       <ScrollRestoration />
       <header className="flex items-center justify-between pt-[max(1.25rem,env(safe-area-inset-top))] pb-2">
-        <Link to="/" aria-label="Titan, home" className="-ml-1 rounded-lg px-1 py-1 transition-[scale] duration-150 ease-out active:scale-[0.96]">
+        <Link to="/" aria-label="Titan, home" className="-ml-1 rounded-lg px-1 py-1 transition-[scale] duration-150 ease-out not-disabled:active:scale-[0.96]">
           <Wordmark />
         </Link>
         <div className="-mr-2 flex items-center">
@@ -34,7 +39,7 @@ export default function Layout() {
         </div>
       </header>
       {/* Keyed by address, so each page fades in as it arrives. */}
-      <main key={pathname} className="page flex flex-1 flex-col">
+      <main ref={main} tabIndex={-1} key={pathname} className="page flex flex-1 flex-col outline-none">
         <Outlet />
       </main>
       <AnimatePresence>{settings && <SettingsDialog onClose={() => setSettings(false)} />}</AnimatePresence>

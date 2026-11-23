@@ -33,7 +33,7 @@ function List({ onClose }: { onClose: () => void }) {
                       <span key={k} className="flex items-center gap-1">
                         {i > 0 && <span className="label-mono mr-0.5 text-faint">or</span>}
                         {keyCaps(k).map((cap) => (
-                          <Kbd key={cap} className="!inline-flex">
+                          <Kbd key={cap} spoken className="inline-flex!">
                             {cap}
                           </Kbd>
                         ))}

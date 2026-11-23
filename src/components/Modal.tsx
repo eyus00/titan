@@ -1,7 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { m } from 'motion/react';
+import { m, useIsPresent } from 'motion/react';
 import Button, { btn } from './Button';
 import Icon from './Icon';
+import { toastHost } from './Toast';
 import { cx } from '../lib/util';
 
 /**
@@ -15,6 +16,10 @@ function Modal({ label, onClose, children }: { label: string; onClose: () => voi
   const ref = useRef<HTMLDialogElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
+
+  // Messages (toasts) show inside the topmost dialog while it is open, not once it starts to close.
+  const present = useIsPresent();
+  useEffect(() => (present && ref.current ? toastHost(ref.current) : undefined), [present]);
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -93,13 +98,13 @@ export function Dialog({
               <h2 className="font-serif text-[1.75rem] leading-tight tracking-[-0.01em] text-balance">{title}</h2>
               {subtitle && <p className="mt-0.5 text-sm text-pretty text-muted">{subtitle}</p>}
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className={cx(btn({ variant: 'ghost', icon: true }), '-mt-1 -mr-2')}>
+            <button type="button" onClick={onClose} aria-label="Close dialog" className={cx(btn({ variant: 'ghost', icon: true }), '-mt-1 -mr-2')}>
               <Icon name="close" />
             </button>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 sm:px-6">{children}</div>
           {footer && (
-            <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-line px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-6">
+            <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-6">
               {footer}
             </footer>
           )}
@@ -114,6 +119,7 @@ export function Confirm({
   title,
   body,
   action,
+  cancel = 'Cancel',
   danger,
   onConfirm,
   onClose,
@@ -121,6 +127,8 @@ export function Confirm({
   title: string;
   body: ReactNode;
   action: string;
+  /** The label of the way out, when "Cancel" would be unclear ("Keep editing"). */
+  cancel?: string;
   danger?: boolean;
   onConfirm: () => void;
   onClose: () => void;
@@ -131,14 +139,17 @@ export function Confirm({
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} data-autofocus>
+          {/* The keyboard starts on the safe choice when the action destroys something. */}
+          <Button onClick={onClose} data-autofocus={danger || undefined}>
+            {cancel}
+          </Button>
+          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} data-autofocus={!danger || undefined}>
             {action}
           </Button>
         </>
       }
     >
-      <p className="text-[15px] leading-relaxed text-pretty text-muted">{body}</p>
+      <p className="text-body leading-relaxed text-pretty text-muted">{body}</p>
     </Dialog>
   );
 }

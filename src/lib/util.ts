@@ -35,7 +35,8 @@ export function formatClock(ms: number) {
 
 export const percent = (v: number) => `${Math.round(v * 100)}%`;
 
-export const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+/** "3 cards", with a non-breaking space so the number never wraps away from its unit. */
+export const plural = (n: number, one: string, many = one + 's') => `${n}\u00a0${n === 1 ? one : many}`;
 
 export function useTitle(title?: string) {
   useEffect(() => {

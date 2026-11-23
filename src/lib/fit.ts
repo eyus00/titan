@@ -40,6 +40,7 @@ export function textHeight(text: string, width: number, size: number): number {
   const hit = heights.get(key);
   if (hit !== undefined) return hit;
   const el = getProbe();
+  el.className = 'card-text';
   el.style.width = `${w}px`;
   el.style.fontSize = `${size}px`;
   el.textContent = text;
@@ -50,14 +51,16 @@ export function textHeight(text: string, width: number, size: number): number {
 }
 
 /** Largest font size (px, in half steps between min and max) at which `text` fits a width x height box. */
-export function fitText(text: string, width: number, height: number, min: number, max: number): Fit {
+export function fitText(text: string, width: number, height: number, min: number, max: number, face = ''): Fit {
   const w = Math.floor(width);
   const h = Math.floor(height);
-  const key = `${w}|${h}|${min}|${max}|${text}`;
+  const key = `${w}|${h}|${min}|${max}|${face}|${text}`;
   const hit = cache.get(key);
   if (hit) return hit;
 
   const el = getProbe();
+  // `face`: extra classes the real text carries that change its width (a different font, tracking).
+  el.className = `card-text ${face}`;
   el.style.width = `${w}px`;
   el.textContent = text;
   const ok = (size: number) => {

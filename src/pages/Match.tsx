@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence, m, useReducedMotion } from 'motion/react';
 import Button, { btn } from '../components/Button';
 import { Choice } from '../components/Controls';
 import Icon from '../components/Icon';
@@ -19,6 +19,8 @@ import NotFound from './NotFound';
 
 /** Added to the clock for every wrong pair in a timed round. */
 const PENALTY_MS = 1000;
+/** How long a board takes to arrive (the deal-in animation in index.css). */
+const DEAL_MS = 380;
 
 type Phase = 'ready' | 'playing' | 'done';
 
@@ -87,8 +89,8 @@ export default function Match() {
   if (cards.length < 2) {
     return (
       <div className="page mx-auto flex min-h-dvh max-w-3xl flex-col items-start justify-center px-5 pb-[12vh] sm:px-8">
-        <h1 className="font-serif text-5xl leading-none text-balance">Not enough cards yet.</h1>
-        <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-pretty text-muted">A round needs at least two cards with both a term and a definition.</p>
+        <h1 className="font-serif text-5xl leading-none tracking-[-0.01em] text-balance">Not enough cards yet.</h1>
+        <p className="mt-4 max-w-sm text-body leading-relaxed text-pretty text-muted">A round needs at least two cards with both a term and a definition.</p>
         <Link to={`/set/${set.id}/edit`} className={btn({ variant: 'primary' }) + ' mt-7'}>
           Edit this set
         </Link>
@@ -101,7 +103,7 @@ export default function Match() {
 function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
   const navigate = useNavigate();
   const settings = useStore((s) => s.settings);
-  useTitle(set.title);
+  useTitle(`Match · ${set.title}`);
   useGameScreen();
 
   const [phase, setPhase] = useState<Phase>('ready');
@@ -115,6 +117,8 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
   const [made, setMade] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const [result, setResult] = useState<Result | null>(null);
+  /** What just happened, in words, for screen readers (colour, movement and sound say it otherwise). */
+  const [spoken, setSpoken] = useState('');
 
   /** Everything about the running session that the screen doesn't need to re-render for. */
   const run = useRef({
@@ -138,7 +142,7 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
 
   // ---------- the free area for the board ----------
 
-  const area = useRef<HTMLDivElement>(null);
+  const area = useRef<HTMLElement>(null);
   const [box, setBox] = useState<Box | null>(null);
   const measure = useCallback((): Box | null => {
     const el = area.current;
@@ -179,7 +183,7 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
   // The board sizes on offer: the standard ones this set and this screen can hold, plus
   // "all" for a set smaller than the largest board.
   const pairOptions = useMemo(() => {
-    const off = (n: number) => ({ disabled: n > maxFit, title: n > maxFit ? "Doesn't fit this screen" : undefined });
+    const off = (n: number) => ({ disabled: n > maxFit, title: n > maxFit ? 'Doesn’t fit this screen' : undefined });
     const options = PAIR_CHOICES.filter((n) => n <= cards.length).map((n) => ({ value: n as number, label: String(n), ...off(n) }));
     if (cards.length < PAIR_CHOICES[PAIR_CHOICES.length - 1] && !options.some((o) => o.value === cards.length)) {
       options.push({ value: cards.length, label: `All ${cards.length}`, ...off(cards.length) });
@@ -252,7 +256,8 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
     const now = Date.now();
     Object.assign(run.current, {
       endless: settings.endless,
-      startedAt: performance.now(),
+      // The clock starts once the cards have landed, not while they are still being dealt.
+      startedAt: performance.now() + DEAL_MS,
       penalty: 0,
       boards: 0,
       made: 0,
@@ -281,6 +286,11 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
     const ms = elapsed();
     r.frozen = ms;
     const stats = getState().sets.find((s) => s.id === set.id)?.stats ?? {};
+    setSpoken(
+      r.endless
+        ? `Run stopped. ${plural(r.made, 'pair')} in ${formatClock(ms)}, ${plural(r.mistakes, 'mistake')}.`
+        : `Cleared in ${formatDuration(ms)} with ${plural(r.mistakes, 'mistake')}.${record?.isBest && record.previous !== undefined ? ' A new best.' : ''}`,
+    );
     setResult({
       endless: r.endless,
       ms,
@@ -296,7 +306,7 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
     stopMusic(0.7);
     sfx(record?.isBest && record.previous !== undefined ? 'best' : 'win');
     // Let the last pair finish clearing before the result takes the screen.
-    r.timer = window.setTimeout(() => setPhase('done'), 420);
+    r.timer = window.setTimeout(() => setPhase('done'), 300);
   };
 
   /** Stop an endless run. */
@@ -345,6 +355,7 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
       setMistakes(r.mistakes);
       setWrong((w) => ({ keys: [tile.key, other.key], n: (w?.n ?? 0) + 1 }));
       sfx('miss');
+      setSpoken(`Not a pair.${r.endless ? '' : ' One second added.'} ${plural(r.mistakes, 'mistake')}.`);
       navigator.vibrate?.(35);
       return;
     }
@@ -354,6 +365,7 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
     r.made++;
     setMade(r.made);
     sfx('match', next.size / 2 - 1);
+    setSpoken(`Pair matched. ${next.size / 2} of ${tiles.length / 2}.`);
     // A card is learned a little more when both of its halves are matched without a miss.
     const clean = [...new Set([tile.cardId, other.cardId])].filter((cid) => next.has(`${cid}:t`) && next.has(`${cid}:d`) && !r.boardMissed.has(cid));
     actions.answer(set.id, clean.map((cid) => ({ id: cid, correct: true })));
@@ -362,11 +374,20 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
     r.boards++;
     if (r.endless) {
       actions.recordBoard(set.id, tiles.length / 2);
-      r.timer = window.setTimeout(dealBoard, 520);
+      r.timer = window.setTimeout(dealBoard, 380);
     } else {
       finish(actions.recordBoard(set.id, tiles.length / 2, elapsed()));
     }
   };
+
+  // The window got smaller mid-game (rotated, resized, zoomed) and the cards on the table no
+  // longer fit: deal a fresh board that does, rather than squeeze or cut their text.
+  useEffect(() => {
+    if (phase !== 'playing' || !box || !tiles.length || run.current.frozen !== null) return;
+    if (!planBoard(tiles.map((t) => t.text), box.w, box.h).fits) dealBoard();
+    // Only a change of size asks this question.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box]);
 
   // The red flash on a wrong pair clears itself.
   useEffect(() => {
@@ -406,7 +427,7 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
   };
 
   useHotkeys('Match', [
-    { keys: ['Escape'], label: selected ? 'Put the card down' : run.current.endless && phase === 'playing' ? 'Stop' : 'Leave the game', run: () => (phase === 'playing' && selected ? setSelected(null) : phase === 'playing' && run.current.endless ? stop() : leave()) },
+    { keys: ['Escape'], label: selected ? 'Put the card down' : run.current.endless && phase === 'playing' ? 'Stop' : 'Leave', run: () => (phase === 'playing' && selected ? setSelected(null) : phase === 'playing' && run.current.endless ? stop() : leave()) },
     { keys: ['m'], label: 'Music on or off', run: () => toggle({ music: !settings.music }) },
     { keys: ['n'], label: 'Sound effects on or off', run: () => toggle({ sfx: !settings.sfx }) },
     { keys: ['Enter', ' '], label: phase === 'done' ? 'Play again' : 'Start', when: phase !== 'playing', run: start },
@@ -420,7 +441,7 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
 
   return (
     <div className="fixed inset-0 flex touch-manipulation flex-col overflow-hidden overscroll-none bg-bg select-none">
-      <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center px-2 sm:px-4" style={{ marginTop: 'env(safe-area-inset-top)' }}>
+      <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center pr-[max(0.5rem,env(safe-area-inset-right))] pl-[max(0.5rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] sm:pl-[max(1rem,env(safe-area-inset-left))]" style={{ marginTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center gap-1.5">
           {playing && run.current.endless ? (
             <Button size="sm" onClick={stop} className="ml-1">
@@ -456,7 +477,8 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
       </header>
 
       {/* The board's area. It is always here (also behind the start and result screens) so its size is known before dealing. */}
-      <div ref={area} className="relative min-h-0 flex-1 overflow-hidden px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-4">
+      <main ref={area} className="relative min-h-0 flex-1 overflow-hidden pt-1 pr-[max(0.75rem,env(safe-area-inset-right))] pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))] sm:pb-4 sm:pl-[max(1.5rem,env(safe-area-inset-left))]">
+        {playing && <h1 className="sr-only">Match: {set.title}</h1>}
         {playing && box && <Board key={deal} tiles={tiles} box={box} selected={selected} matched={matched} wrong={wrong?.keys} onPick={onPick} />}
 
         {!playing && (
@@ -464,12 +486,12 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
             {phase === 'ready' ? (
               <div className="m-auto flex w-full max-w-md flex-col items-center py-6 text-center">
                 <p className="enter label-mono text-muted">match</p>
-                <h1 className="enter mt-2 font-serif text-[clamp(2.4rem,9vw,3.5rem)] leading-none tracking-[-0.01em] text-balance break-words">{set.title}</h1>
+                <h1 className="enter mt-2 font-serif text-[clamp(2.4rem,9vw,3.5rem)] leading-[1.05] tracking-[-0.01em] text-balance break-words">{set.title}</h1>
 
                 <div className="enter mt-8 flex flex-col items-center gap-3" style={{ '--i': 1 } as CSSProperties}>
                   <GridPreview cols={grid?.cols ?? 4} rows={grid?.rows ?? 4} count={pairs * 2} ratio={box ? box.w / box.h : 1.6} />
                   <p className="label-mono text-muted">
-                    {grid ? `${grid.cols} × ${grid.rows}` : ''} · {pairs * 2} cards
+                    {grid ? `${grid.cols} × ${grid.rows}` : ''} · {plural(pairs, 'pair')}
                   </p>
                   {pairOptions.length > 1 && (
                     <div className="flex items-center gap-2">
@@ -479,7 +501,7 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
                     </div>
                   )}
                   {maxFit < Math.min(cards.length, PAIR_CHOICES[PAIR_CHOICES.length - 1]) && (
-                    <p className="max-w-xs text-[13px] text-pretty text-faint">Bigger boards won’t fit this screen with these definitions, so they’re off.</p>
+                    <p className="max-w-xs text-caption text-pretty text-faint">Bigger boards won’t fit this screen with these definitions, so they’re off.</p>
                   )}
                 </div>
 
@@ -493,9 +515,9 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
                       { value: 'endless', label: <><Icon name="endless" size={14} stroke={2} />Endless<Kbd on={settings.endless} className="ml-0.5">E</Kbd></> },
                     ]}
                   />
-                  <p className="max-w-xs text-[14px] leading-relaxed text-pretty text-muted">
+                  <p className="max-w-xs text-sm leading-relaxed text-pretty text-muted">
                     {settings.endless
-                      ? 'Boards keep coming until you stop. The terms you miss come back more often.'
+                      ? 'Boards keep coming until you stop. The cards you miss come back more often.'
                       : 'Clear the board as fast as you can. A wrong pair costs a second.'}
                   </p>
                 </div>
@@ -514,7 +536,7 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
             )}
           </div>
         )}
-      </div>
+      </main>
 
       {/* Keyboard cues, only where there is a keyboard. */}
       <footer className={cx('label-mono hidden h-9 shrink-0 items-center justify-center gap-5 pb-2 text-faint keys:flex', !playing && 'invisible')} aria-hidden>
@@ -534,21 +556,28 @@ function Game({ set, cards }: { set: StudySet; cards: Card[] }) {
           {selected ? 'put down' : run.current.endless ? 'stop' : 'leave'}
         </span>
       </footer>
+      <p role="status" className="sr-only">
+        {spoken}
+      </p>
       <Shortcuts />
     </div>
   );
 }
 
 function IconToggle({ on, label, hint, icon, onClick }: { on: boolean; label: string; hint: string; icon: 'music' | 'musicOff' | 'sound' | 'soundOff'; onClick: () => void }) {
+  // With reduced motion the two icons only cross-fade.
+  const reduce = useReducedMotion();
+  const away = reduce ? { opacity: 0 } : { opacity: 0, scale: 0.25, filter: 'blur(4px)' };
+  const here = reduce ? { opacity: 1 } : { opacity: 1, scale: 1, filter: 'blur(0px)' };
   return (
-    <button type="button" onClick={onClick} aria-label={label} aria-pressed={on} title={`${label} ${on ? 'on' : 'off'} (${hint})`} className={btn({ variant: 'ghost', icon: true })}>
+    <button type="button" onClick={onClick} aria-label={label} aria-pressed={on} title={`${label} ${on ? 'on' : 'off'} (${hint})`} className={cx(btn({ variant: 'ghost', icon: true }), 'relative')}>
       {/* The two states cross-fade in place. */}
       <AnimatePresence mode="popLayout" initial={false}>
         <m.span
           key={icon}
-          initial={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
-          animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
+          initial={away}
+          animate={here}
+          exit={away}
           transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
           className="flex"
         >
@@ -567,7 +596,7 @@ function GridPreview({ cols, rows, count, ratio }: { cols: number; rows: number;
   const h = w / r;
   return (
     <div className="flex h-[120px] items-center justify-center" aria-hidden>
-      <div className="grid gap-[3px]" style={{ width: w, height: h, gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}>
+      <div className="relative grid gap-[3px]" style={{ width: w, height: h, gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}>
         <AnimatePresence initial={false} mode="popLayout">
           {Array.from({ length: count }, (_, i) => (
             <m.span
@@ -743,6 +772,7 @@ function Summary({ result, onAgain, onLeave }: { result: Result; onAgain: () => 
   const gained = Math.round((result.after - result.before) * 100);
   return (
     <div className="m-auto flex w-full max-w-md flex-col items-center py-6 text-center">
+      <h1 className="sr-only">{result.endless ? `Run stopped: ${plural(result.pairs, 'pair')}` : `Cleared in ${formatDuration(result.ms)}`}</h1>
       <p className={cx('enter label-mono', beat ? 'text-ok' : 'text-muted')}>{result.endless ? 'run stopped' : beat ? 'new best' : 'cleared'}</p>
       <p className="enter mt-1 font-serif text-[clamp(4.5rem,22vw,7rem)] leading-none tracking-[-0.02em] tabular-nums">
         {result.endless ? (
@@ -778,12 +808,12 @@ function Summary({ result, onAgain, onLeave }: { result: Result; onAgain: () => 
       <div className="enter mt-8 flex items-center justify-center gap-8" style={{ '--i': 1 } as CSSProperties}>
         <Stat label="accuracy">
           <Ring value={accuracy} size={64} width={5}>
-            <Count value={accuracy * 100} className="font-mono text-[13px]" />
+            <Count value={accuracy * 100} className="font-mono text-caption" />
           </Ring>
         </Stat>
         <Stat label={gained > 0 ? `mastery +${gained}` : 'mastery'}>
           <Ring value={result.after} size={64} width={5}>
-            <Count value={result.after * 100} className="font-mono text-[13px]" />
+            <Count value={result.after * 100} className="font-mono text-caption" />
           </Ring>
         </Stat>
       </div>
@@ -806,8 +836,8 @@ function Summary({ result, onAgain, onLeave }: { result: Result; onAgain: () => 
           <ul className="overflow-hidden rounded-2xl border border-line">
             {result.missed.map((c) => (
               <li key={c.id} className="border-b border-line px-4 py-3 last:border-b-0">
-                <p className="text-[15px] leading-snug break-words">{c.term}</p>
-                <p className="mt-0.5 text-sm leading-snug break-words whitespace-pre-line text-muted">{c.def}</p>
+                <p className="text-body leading-normal break-words">{c.term}</p>
+                <p className="mt-0.5 text-sm leading-normal break-words whitespace-pre-line text-muted">{c.def}</p>
               </li>
             ))}
           </ul>

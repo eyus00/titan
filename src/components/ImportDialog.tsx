@@ -4,7 +4,7 @@ import { Choice } from './Controls';
 import Icon from './Icon';
 import Kbd, { MOD } from './Kbd';
 import { Dialog } from './Modal';
-import { toast } from './Toast';
+import { toastError } from './Toast';
 import { useHotkeys } from '../lib/hotkeys';
 import { CARD_SEPS, DEFAULT_OPTIONS, TERM_SEPS, detect, parseList, placeholder, type ParseOptions, type ParsedCard } from '../lib/parse';
 import { cx, plural } from '../lib/util';
@@ -42,9 +42,9 @@ export default function ImportDialog({ onImport, onClose }: { onImport: (cards: 
 
   const readFile = async (file: File | undefined) => {
     if (!file) return;
-    if (file.size > FILE_MAX_BYTES) return toast('That file is too large to import.');
+    if (file.size > FILE_MAX_BYTES) return toastError('That file is over 2\u00a0MB. Paste the list in, or split the file.');
     const content = await file.text();
-    if (content.includes('\u0000')) return toast("That doesn't look like a text file.");
+    if (content.includes('\u0000')) return toastError('That isn’t a text file. Choose a .txt or .csv file, or paste the list in.');
     setFileName(file.name.replace(/\.[^.]+$/, ''));
     change(content);
   };
@@ -69,18 +69,18 @@ export default function ImportDialog({ onImport, onClose }: { onImport: (cards: 
   return (
     <Dialog
       title="Import a list"
-      subtitle="Paste your words and definitions, or drop in a text or CSV file."
+      subtitle="Paste your terms and definitions, or drop in a text or CSV file up to 2 MB."
       wide
       onClose={onClose}
       footer={
         <>
-          <span className="label-mono mr-auto min-w-0 truncate text-muted">
+          <span className="label-mono mr-auto text-muted max-sm:basis-full">
             {cards.length ? plural(cards.length, 'card') : 'nothing to import yet'}
             {incomplete > 0 && <span className="text-bad"> · {incomplete} incomplete</span>}
           </span>
           <Button onClick={onClose}>Cancel</Button>
           <Button variant="primary" disabled={!cards.length} onClick={() => onImport(cards, fileName)}>
-            Import{cards.length ? ` ${cards.length}` : ''}
+            Import{cards.length ? <span className="tabular-nums"> {cards.length}</span> : ''}
             <Kbd on>{MOD}</Kbd>
             <Kbd on className="-ml-1">
               ↵
@@ -106,21 +106,27 @@ export default function ImportDialog({ onImport, onClose }: { onImport: (cards: 
           placeholder={placeholder(opts)}
           spellCheck={false}
           aria-label="Your list"
+          aria-describedby="list-hint"
           className={cx(
-            'block h-44 w-full resize-y rounded-2xl border bg-bg px-4 py-3 font-mono text-[13px] leading-relaxed whitespace-pre text-fg transition-colors placeholder:text-faint',
-            dragging ? 'border-fg' : 'border-line focus:border-fg/40',
+            'block h-44 w-full resize-y rounded-2xl border bg-bg px-4 py-3 font-mono text-base leading-relaxed whitespace-pre text-fg sm:text-caption transition-[color,background-color,border-color] duration-150 ease-out placeholder:text-faint',
+            dragging ? 'border-fg' : 'border-line-strong focus:border-fg',
           )}
         />
         <input ref={fileInput} type="file" accept=".txt,.csv,.tsv,.md,text/*" hidden onChange={(e) => (void readFile(e.target.files?.[0]), (e.target.value = ''))} />
         <button
           type="button"
           onClick={() => fileInput.current?.click()}
-          className="label-mono absolute right-2.5 bottom-2.5 inline-flex h-7 items-center gap-1.5 rounded-full bg-surface px-2.5 text-muted ring-1 ring-line transition-[color,scale] duration-150 ease-out hover:text-fg active:scale-[0.96]"
+          className="label-mono absolute right-2.5 bottom-2.5 inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 text-muted transition-[color,scale] duration-150 ease-out hover:text-fg not-disabled:active:scale-[0.96]"
         >
           <Icon name="file" size={14} />
           open file
         </button>
       </div>
+
+      {/* Tab is taken by the box (it types the separator), so say how to leave it. */}
+      <p id="list-hint" className="label-mono mt-2 hidden text-faint keys:block">
+        tab types a tab · shift + tab leaves the box
+      </p>
 
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
         <Separator
@@ -182,19 +188,20 @@ function Separator<T extends string>({
 }) {
   return (
     <div>
-      <div className="mb-2 text-[13px] text-muted">{title}</div>
+      <div className="mb-2 text-caption text-muted">{title}</div>
       <Choice label={title} value={value} onChange={onPick} options={options.map((o) => ({ value: o.id, label: o.label }))} />
       {value === 'custom' && (
         <input
           autoFocus
           value={custom}
           onChange={(e) => onCustom(e.target.value)}
-          placeholder="e.g.  ->  or \n for a new line"
+          placeholder="->"
           aria-label={`Custom separator: ${title}`}
           spellCheck={false}
-          className="mt-2 h-9 w-full rounded-full border border-line bg-bg px-3.5 font-mono text-[13px] placeholder:text-faint focus:border-fg/40"
+          className="mt-2 h-9 w-full rounded-full border border-line-strong bg-bg px-3.5 font-mono text-base placeholder:text-faint focus:border-fg sm:text-caption"
         />
       )}
+      {value === 'custom' && <p className="label-mono mt-1.5 text-faint normal-case">Type \n for a new line, \t for a tab.</p>}
     </div>
   );
 }

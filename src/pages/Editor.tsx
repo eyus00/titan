@@ -6,7 +6,7 @@ import Icon from '../components/Icon';
 import ImportDialog from '../components/ImportDialog';
 import Kbd, { MOD } from '../components/Kbd';
 import { Confirm } from '../components/Modal';
-import { toast } from '../components/Toast';
+import { toast, toastError } from '../components/Toast';
 import { useHotkeys } from '../lib/hotkeys';
 import type { ParsedCard } from '../lib/parse';
 import { actions, useStore, type StudySet } from '../lib/store';
@@ -64,6 +64,17 @@ function Form({ set }: { set?: StudySet }) {
     setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.id !== id) : [blank()]));
   }, []);
 
+  /** Remove the card whose term or definition has the keyboard. */
+  const removeFocused = () => {
+    const id = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-row]')?.dataset.row;
+    if (!id) return;
+    const at = rows.findIndex((r) => r.id === id);
+    remove(id);
+    // The keyboard moves to the neighbouring card.
+    const next = rows[at + 1] ?? rows[at - 1];
+    if (next) setFocusId(next.id);
+  };
+
   const add = useCallback(() => {
     const row = blank();
     setRows((rs) => [...rs, row]);
@@ -75,11 +86,11 @@ function Form({ set }: { set?: StudySet }) {
     if (!title.trim() && fileName) setTitle(fileName);
     setDirty(true);
     setImporting(false);
-    toast(`Added ${plural(cards.length, 'card')}`);
+    toast(`Imported ${plural(cards.length, 'card')}`);
   };
 
   const save = () => {
-    if (!filled.length) return toast('Add at least one card first.');
+    if (!filled.length) return toastError('There are no cards to save yet. Fill in a term and a definition, or import a list.');
     leaving.current = true;
     const draft = { title, cards: filled };
     if (set) {
@@ -91,31 +102,36 @@ function Form({ set }: { set?: StudySet }) {
   };
 
   useHotkeys(set ? 'Editing' : 'New set', [
-    { keys: ['mod+s'], label: set ? 'Save changes' : 'Create the set', inFields: true, run: save },
+    { keys: ['mod+s'], label: set ? 'Save changes' : 'Create set', inFields: true, run: save },
     { keys: ['mod+i'], label: 'Import a list', inFields: true, run: () => setImporting(true) },
     { keys: ['mod+Enter'], label: 'Add a card', inFields: true, run: add },
-    { keys: ['Escape'], label: 'Leave without saving', run: () => navigate(back) },
+    { keys: ['Escape'], label: 'Cancel', run: () => navigate(back) },
+    { keys: ['mod+Backspace'], label: 'Remove the card being typed in', inFields: true, run: removeFocused },
   ]);
 
   return (
     <>
-      <Link to={back} className="label-mono mt-6 inline-flex w-fit items-center gap-1.5 rounded py-1 text-muted transition-colors duration-150 hover:text-fg sm:mt-9">
+      <Link to={back} className="label-mono mt-6 inline-flex w-fit items-center gap-1.5 rounded py-1 text-muted transition-[color,background-color,border-color] duration-150 ease-out hover:text-fg sm:mt-9">
         <Icon name="back" size={14} />
         {set ? 'back to set' : 'sets'}
         <Kbd className="ml-1">Esc</Kbd>
       </Link>
 
+      <h1 className="sr-only">{set ? `Edit ${set.title}` : 'New set'}</h1>
+      <label htmlFor="set-title" className="label-mono mt-4 block text-muted">
+        title
+      </label>
       <input
+        id="set-title"
         value={title}
         onChange={(e) => {
           setTitle(e.target.value);
           setDirty(true);
         }}
-        placeholder="Name this set"
-        aria-label="Set title"
+        placeholder="Untitled set"
         maxLength={120}
         autoFocus={!set}
-        className="mt-3 w-full border-b border-line bg-transparent pb-2 font-serif text-[clamp(2.2rem,8vw,3.5rem)] leading-tight tracking-[-0.01em] transition-colors placeholder:text-faint focus:border-fg/50"
+        className="mt-1 w-full border-b border-line-strong bg-transparent pb-2 font-serif text-[clamp(2.2rem,8vw,3.5rem)] leading-tight tracking-[-0.01em] transition-[color,background-color,border-color] duration-150 ease-out placeholder:text-faint focus:border-fg"
       />
 
       <div className="mt-6 flex items-center justify-between gap-3">
@@ -128,7 +144,13 @@ function Form({ set }: { set?: StudySet }) {
         </Button>
       </div>
 
-      <ol className="mt-4 space-y-2.5">
+      {/* What the two columns are, in words that stay visible once the fields are filled in. */}
+      <div className="label-mono mt-5 hidden grid-cols-[1.5rem_minmax(0,2fr)_minmax(0,3fr)_2rem] gap-x-3 pr-2 pl-4 text-faint sm:grid" aria-hidden>
+        <span />
+        <span>term</span>
+        <span>definition</span>
+      </div>
+      <ol className="mt-4 space-y-2.5 sm:mt-1.5">
         {rows.map((row, i) => (
           <RowEditor key={row.id} row={row} index={i} last={i === rows.length - 1} focus={row.id === focusId} onChange={change} onRemove={remove} onAdd={add} />
         ))}
@@ -137,7 +159,7 @@ function Form({ set }: { set?: StudySet }) {
       <button
         type="button"
         onClick={add}
-        className="mt-2.5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-line text-sm text-muted transition-colors hover:border-fg/30 hover:text-fg"
+        className="mt-2.5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-line text-sm text-muted transition-[color,border-color,scale] duration-150 ease-out hover:border-fg/30 hover:text-fg not-disabled:active:scale-[0.98]"
       >
         <Icon name="plus" size={16} />
         Add a card
@@ -145,9 +167,9 @@ function Form({ set }: { set?: StudySet }) {
 
       {/* Room for the save bar, which stays at the bottom of the screen. */}
       <div className="h-24" />
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/90 backdrop-blur-md">
+      <div data-savebar className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/90 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-end gap-2 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8">
-          <span className="label-mono mr-auto hidden items-center gap-1.5 text-faint keys:flex">
+          <span className="label-mono mr-auto hidden items-center gap-1.5 text-faint md:keys:flex">
             <Kbd>Tab</Kbd>
             from the last definition adds a card
           </span>
@@ -170,8 +192,9 @@ function Form({ set }: { set?: StudySet }) {
           <Confirm
             key="discard"
             title="Discard changes?"
-            body="What you changed on this page hasn't been saved."
-            action="Discard"
+            body="What you changed on this page hasn’t been saved."
+            action="Discard changes"
+            cancel="Keep editing"
             danger
             onConfirm={() => blocker.proceed()}
             onClose={() => blocker.reset()}
@@ -213,7 +236,7 @@ const RowEditor = memo(function RowEditor({
   };
 
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 rounded-2xl border border-line bg-surface py-2 pr-2 pl-4 transition-colors focus-within:border-fg/30 sm:grid-cols-[1.5rem_minmax(0,2fr)_minmax(0,3fr)_auto] sm:gap-x-3">
+    <li data-row={row.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 rounded-2xl border border-line bg-surface py-2 pr-2 pl-4 transition-[color,background-color,border-color] duration-150 ease-out focus-within:border-fg/60 sm:grid-cols-[1.5rem_minmax(0,2fr)_minmax(0,3fr)_auto] sm:gap-x-3">
       <span className="label-mono hidden pt-[11px] text-faint sm:block">{index + 1}</span>
       <AutoTextarea ref={term} value={row.term} onChange={(e) => onChange(row.id, 'term', e.target.value)} placeholder="Term" aria-label={`Term ${index + 1}`} className="sm:border-r sm:border-line sm:pr-3" />
       <AutoTextarea
@@ -228,6 +251,9 @@ const RowEditor = memo(function RowEditor({
         type="button"
         onClick={() => onRemove(row.id)}
         aria-label={`Remove card ${index + 1}`}
+        aria-keyshortcuts="Control+Backspace Meta+Backspace"
+        title={`Remove card (${MOD} ⌫)`}
+        // Out of the Tab order so typing flows term, definition, next term; the shortcut above removes a card from the keyboard.
         tabIndex={-1}
         className={cx(btn({ variant: 'ghost', icon: true, size: 'sm' }), 'col-start-2 row-start-1 mt-0.5 text-faint sm:col-start-4')}
       >
@@ -258,7 +284,7 @@ function AutoTextarea({ ref, className, value, ...rest }: TextareaHTMLAttributes
       }}
       rows={1}
       value={value}
-      className={cx('block field-sizing-content w-full resize-none bg-transparent py-2 text-[15px] leading-snug placeholder:text-faint', className)}
+      className={cx('block field-sizing-content w-full resize-none bg-transparent py-2 text-base leading-snug placeholder:text-faint sm:text-body', className)}
       {...rest}
     />
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { getState } from './store';
 
 /**
  * Keyboard shortcuts. A component declares the keys that work while it is on screen; the
@@ -48,6 +49,9 @@ function matches(e: KeyboardEvent, spec: string) {
 let keyboard = false;
 export const usingKeyboard = () => keyboard;
 
+/** A shortcut that is one plain character ("n", "?", "1"), as opposed to Enter, arrows or Cmd+S. */
+export const isSingleKey = (spec: string) => spec.length === 1 && spec !== ' ';
+
 const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
 if (typeof window !== 'undefined') {
@@ -60,11 +64,12 @@ if (typeof window !== 'undefined') {
     if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.matches('button:focus-visible, a:focus-visible, [role="button"]:focus-visible, summary:focus-visible')) return;
     const inField = typing(e.target);
     const inDialog = !!document.querySelector('dialog[open]');
+    const singles = getState().settings.shortcuts;
     // Later groups (deeper in the page) win over earlier ones.
     for (const group of [...groups].reverse()) {
       for (const hk of group.current.list) {
         if (hk.when === false || (inField && !hk.inFields) || (inDialog && !hk.inDialog)) continue;
-        if (!hk.keys.some((k) => matches(e, k))) continue;
+        if (!hk.keys.some((k) => (singles || !isSingleKey(k)) && matches(e, k))) continue;
         e.preventDefault();
         hk.run(e);
         return;
@@ -93,7 +98,17 @@ export function useActiveHotkeys(): Group[] {
     (l) => (listeners.add(l), () => void listeners.delete(l)),
     () => version,
   );
-  return [...groups].map((g) => ({ title: g.current.title, list: g.current.list.filter((h) => h.label && h.when !== false) })).filter((g) => g.list.length);
+  const singles = getState().settings.shortcuts;
+  return [...groups]
+    .map((g) => ({
+      title: g.current.title,
+      // With single-key shortcuts off, only the keys that still work are listed.
+      list: g.current.list
+        .filter((h) => h.label && h.when !== false)
+        .map((h) => (singles ? h : { ...h, keys: h.keys.filter((k) => !isSingleKey(k)) }))
+        .filter((h) => h.keys.length),
+    }))
+    .filter((g) => g.list.length);
 }
 
 const NAMES: Record<string, string> = {

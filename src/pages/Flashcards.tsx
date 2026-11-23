@@ -30,8 +30,8 @@ export default function Flashcards() {
   if (!cards.length) {
     return (
       <div className="page mx-auto flex min-h-dvh max-w-3xl flex-col items-start justify-center px-5 pb-[12vh] sm:px-8">
-        <h1 className="font-serif text-5xl leading-none text-balance">No cards to flip yet.</h1>
-        <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-pretty text-muted">Flashcards need at least one card with both a term and a definition.</p>
+        <h1 className="font-serif text-5xl leading-none tracking-[-0.01em] text-balance">No cards to flip yet.</h1>
+        <p className="mt-4 max-w-sm text-body leading-relaxed text-pretty text-muted">Flashcards need at least one card with both a term and a definition.</p>
         <Link to={`/set/${set.id}/edit`} className={btn({ variant: 'primary' }) + ' mt-7'}>
           Edit this set
         </Link>
@@ -54,7 +54,7 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
   const navigate = useNavigate();
   const front = useStore((s) => s.settings.front);
   const sound = useStore((s) => s.settings.sfx);
-  useTitle(set.title);
+  useTitle(`Flashcards · ${set.title}`);
   useGameScreen();
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
@@ -69,6 +69,8 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
   const [turn, setTurn] = useState(0);
   /** Which way the last card left: 1 = known (right), -1 = again (left). */
   const [way, setWay] = useState<1 | -1>(1);
+  /** What just happened, for screen readers (the card itself is purely visual). */
+  const [spoken, setSpoken] = useState('');
   const history = useRef<Step[]>([]);
   const missed = useRef(new Set<string>());
   const before = useRef(progress(cards, set.stats, Date.now()).mastery);
@@ -79,6 +81,8 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
 
   const flip = () => {
     if (!card) return;
+    const showsDef = (front === 'term') !== flipped;
+    setSpoken(showsDef ? `Definition: ${card.def}` : `Term: ${card.term}`);
     setFlipped((f) => !f);
     sfx('flip');
   };
@@ -102,6 +106,8 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
     setFlipped(false);
     setTurn((t) => t + 1);
     sfx(ok ? 'know' : 'again');
+    const upNext = byId.get((ok ? rest : [...rest.slice(0, Math.min(rest.length, 3)), id])[0] ?? '');
+    setSpoken(`${ok ? `Know it. ${known + 1} of ${total}.` : 'Still learning. It will come back.'}${upNext ? ` Next: ${front === 'term' ? upNext.term : upNext.def}` : ' Deck finished.'}`);
   };
 
   const undo = () => {
@@ -114,6 +120,7 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
     setFlipped(false);
     setWay(1);
     setTurn((t) => t + 1);
+    setSpoken('Undone.');
   };
 
   const restart = () => {
@@ -143,13 +150,16 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-bg select-none">
-      <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center px-2 sm:px-4" style={{ marginTop: 'env(safe-area-inset-top)' }}>
+      <header className={cx('grid h-14 shrink-0 grid-cols-[1fr_minmax(0,14rem)_1fr] items-center', SAFE_X)} style={{ marginTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center">
           <button type="button" onClick={leave} aria-label="Leave flashcards" className={btn({ variant: 'ghost', icon: true })}>
             <Icon name="close" size={20} />
           </button>
+          <button type="button" onClick={undo} disabled={!history.current.length} aria-label="Undo" title="Undo (Z)" className={btn({ variant: 'ghost', icon: true })}>
+            <Icon name="undo" size={20} />
+          </button>
         </div>
-        <div className="flex w-40 flex-col items-center gap-1.5 sm:w-56">
+        <div className="flex w-full flex-col items-center gap-1.5 px-2">
           <span className="label-mono text-muted tabular-nums">
             {known} / {total}
           </span>
@@ -158,8 +168,10 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
           </div>
         </div>
         <div className="flex items-center justify-end">
-          <button type="button" onClick={swapFront} title="Show the other side first (T)" className={cx(btn({ variant: 'ghost', size: 'sm' }), 'label-mono')}>
-            {front === 'term' ? 'term first' : 'definition first'}
+          {/* Words where there is room, an icon on phones. */}
+          <button type="button" onClick={swapFront} title="Show the other side first (T)" className={cx(btn({ variant: 'ghost', size: 'sm' }), 'label-mono max-sm:size-10 max-sm:px-0')}>
+            <Icon name="flip" size={20} className="sm:hidden" />
+            <span className="max-sm:sr-only">{front === 'term' ? 'term first' : 'definition first'}</span>
           </button>
           <button type="button" onClick={() => actions.setSettings({ sfx: !sound })} aria-label="Sound effects" aria-pressed={sound} title={`Sound effects ${sound ? 'on' : 'off'} (N)`} className={btn({ variant: 'ghost', icon: true })}>
             <Icon name={sound ? 'sound' : 'soundOff'} size={20} />
@@ -169,22 +181,22 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
 
       {card ? (
         <>
-          <main className="flex min-h-0 flex-1 items-center justify-center px-4 py-3 sm:px-8">
+          <main className="relative flex min-h-0 flex-1 items-center justify-center px-4 py-3 sm:px-8">
             <AnimatePresence mode="popLayout" custom={way} initial={false}>
               <Flashcard key={turn} card={card} front={front} flipped={flipped} stat={set.stats[card.id]} onFlip={flip} onGrade={grade} />
             </AnimatePresence>
           </main>
 
-          <footer className="flex shrink-0 items-center justify-center gap-2 px-4 pt-1 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:gap-3">
-            <Button size="lg" onClick={() => grade(false)} className="min-w-0 flex-1 px-3 sm:max-w-52 sm:px-5">
+          <footer className="flex shrink-0 items-center justify-center gap-2 px-3 pt-1 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:gap-3 sm:px-4">
+            <Button size="lg" onClick={() => grade(false)} className="min-w-0 flex-1 px-3! sm:max-w-52 sm:px-5!">
               <Icon name="close" size={16} stroke={2} className="max-sm:hidden" />
               <span className="truncate">Still learning</span>
               <Kbd>←</Kbd>
             </Button>
             <Button size="lg" icon onClick={flip} aria-label="Flip the card" title="Flip (Space)">
-              <Icon name="flip" />
+              <Icon name="flip" stroke={2} />
             </Button>
-            <Button size="lg" variant="primary" onClick={() => grade(true)} className="min-w-0 flex-1 px-3 sm:max-w-52 sm:px-5">
+            <Button size="lg" variant="primary" onClick={() => grade(true)} className="min-w-0 flex-1 px-3! sm:max-w-52 sm:px-5!">
               <Icon name="check" size={16} stroke={2} className="max-sm:hidden" />
               <span className="truncate">Know it</span>
               <Kbd on>→</Kbd>
@@ -195,10 +207,10 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
               <Kbd>Space</Kbd>
               flip
             </span>
-            <button type="button" onClick={undo} disabled={!history.current.length} className="flex items-center gap-1.5 rounded transition-colors hover:text-fg disabled:opacity-40" tabIndex={-1}>
+            <span className="flex items-center gap-1.5">
               <Kbd>Z</Kbd>
               undo
-            </button>
+            </span>
             <span className="flex items-center gap-1.5">
               <Kbd>Esc</Kbd>
               leave
@@ -208,11 +220,15 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
       ) : (
         <DeckDone set={set} cards={cards} total={total} firstTry={total - missed.current.size} before={before.current} onAgain={restart} onLeave={leave} />
       )}
+      <p role="status" className="sr-only">
+        {spoken}
+      </p>
       <Shortcuts />
     </div>
   );
 }
 
+const SAFE_X = 'pr-[max(0.5rem,env(safe-area-inset-right))] pl-[max(0.5rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] sm:pl-[max(1rem,env(safe-area-inset-left))]';
 const EASE = [0.2, 0, 0, 1] as const;
 
 /** The card: tap or press Space to turn it over, drag it aside (or use the buttons) to grade it. */
@@ -234,6 +250,8 @@ function Flashcard({
   ref?: Ref<HTMLDivElement>;
 }) {
   const x = useMotionValue(0);
+  /** A press that turned into a drag must not also count as a tap (which would flip the card). */
+  const dragged = useRef(false);
   const rotate = useTransform(x, [-240, 240], [-7, 7]);
   // The verdict shows as the card is dragged toward it.
   const yes = useTransform(x, [30, 130], [0, 1]);
@@ -249,16 +267,24 @@ function Flashcard({
       style={{ x, rotate }}
       drag="x"
       dragSnapToOrigin
+      dragMomentum={false}
       dragElastic={0.7}
       dragConstraints={{ left: 0, right: 0 }}
+      onPointerDown={() => (dragged.current = false)}
+      onDragStart={() => (dragged.current = true)}
       onDragEnd={(_, info) => {
-        if (Math.abs(info.offset.x) > 110 || Math.abs(info.velocity.x) > 650) onGrade(info.offset.x > 0);
+        // Far enough, or a flick in the same direction the card already sits. Pulling back cancels.
+        const flick = Math.abs(info.velocity.x) > 650 && Math.sign(info.velocity.x) === Math.sign(info.offset.x) && Math.abs(info.offset.x) > 40;
+        if (Math.abs(info.offset.x) > 110 || flick) onGrade(info.offset.x > 0);
       }}
-      onTap={onFlip}
+      onTap={() => {
+        if (!dragged.current) onFlip();
+      }}
       variants={{
-        enter: { opacity: 0, scale: 0.96, y: 10 },
+        enter: { opacity: 0, scale: 0.98, y: 10 },
         show: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.3, ease: EASE } },
-        leave: (way: number) => ({ opacity: 0, x: way * 180, rotate: way * 8, transition: { duration: 0.2, ease: 'easeOut' } }),
+        // It leaves the way it was sent, from wherever the drag left it.
+        leave: (way: number) => ({ opacity: 0, x: way * Math.max(180, Math.abs(x.get()) + 60), rotate: way * 8, transition: { duration: 0.2, ease: 'easeOut' } }),
       }}
       initial="enter"
       animate="show"
@@ -266,26 +292,29 @@ function Flashcard({
     >
       <m.div className="relative size-full [transform-style:preserve-3d]" initial={false} animate={{ rotateY: flipped ? 180 : 0 }} transition={{ type: 'spring', duration: 0.55, bounce: 0 }}>
         {sides.map(([label, text], i) => (
-          <Face key={label} label={label} text={text} back={i === 1} level={level} />
+          <Face key={label} label={label} text={text} back={i === 1} hidden={(i === 1) !== flipped} level={level} />
         ))}
       </m.div>
-      <m.span style={{ opacity: yes }} className="label-mono pointer-events-none absolute top-4 right-5 rounded-full bg-ok/15 px-2.5 py-1 text-ok">
+      <m.span aria-hidden style={{ opacity: yes }} className="label-mono pointer-events-none absolute top-4 right-5 rounded-full bg-ok/15 px-2.5 py-1 text-ok">
         know it
       </m.span>
-      <m.span style={{ opacity: no }} className="label-mono pointer-events-none absolute top-4 left-5 rounded-full bg-fg/10 px-2.5 py-1 text-muted">
+      <m.span aria-hidden style={{ opacity: no }} className="label-mono pointer-events-none absolute top-4 left-5 rounded-full bg-fg/10 px-2.5 py-1 text-muted">
         still learning
       </m.span>
     </m.div>
   );
 }
 
-function Face({ label, text, back, level }: { label: string; text: string; back: boolean; level: number }) {
+/** The face class that changes how wide the text runs (the term side is set in the serif). */
+const TERM_FACE = 'font-serif tracking-[-0.01em]';
+
+function Face({ label, text, back, hidden, level }: { label: string; text: string; back: boolean; hidden: boolean; level: number }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState(22);
   // The text is set as large as fits the card, like the cards in Match.
   useLayoutEffect(() => {
     const el = box.current!;
-    const fit = () => setSize(fitText(text, el.clientWidth, el.clientHeight, 14, label === 'term' ? 40 : 30).size);
+    const fit = () => setSize(fitText(text, el.clientWidth, el.clientHeight, 14, label === 'term' ? 40 : 30, label === 'term' ? TERM_FACE : '').size);
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
@@ -296,14 +325,15 @@ function Face({ label, text, back, level }: { label: string; text: string; back:
     <div
       className="absolute inset-0 flex flex-col rounded-3xl border border-line bg-surface px-6 pt-4 pb-6 [backface-visibility:hidden] sm:px-10"
       style={{ transform: back ? 'rotateY(180deg)' : undefined } as CSSProperties}
-      aria-hidden={undefined}
+      // Only the side facing up is there for assistive tech; the other is the answer.
+      aria-hidden={hidden || undefined}
     >
       <div className="flex shrink-0 items-center justify-between">
         <span className="label-mono text-faint">{label}</span>
         <Ring value={level} size={16} width={2.5} className="opacity-80" />
       </div>
       <div ref={box} className="mt-2 flex min-h-0 flex-1 items-center justify-center overflow-y-auto overscroll-contain text-center">
-        <span className={cx('card-text m-auto', label === 'term' && 'font-serif tracking-[-0.01em]')} style={{ fontSize: size }}>
+        <span className={cx('card-text m-auto', label === 'term' && TERM_FACE)} style={{ fontSize: size }}>
           {text}
         </span>
       </div>

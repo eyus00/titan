@@ -119,7 +119,7 @@ export const SONGS: Song[] = [
   {
     id: 'pulse',
     name: 'Pulse',
-    mood: 'Fast and driving, for speed runs',
+    mood: 'Fast and driving, for timed rounds',
     step: 5250, // 126 bpm
     // Am, F, C, G, Am, F, Dm, Em
     bars: [

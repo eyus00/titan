@@ -39,7 +39,7 @@ export default function Home() {
           <Kbd on>N</Kbd>
         </Link>
       </div>
-      <div className="enter mt-3 flex h-6 items-end justify-between gap-4">
+      <div className="enter mt-3 flex min-h-6 flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <p className="label-mono flex items-center gap-1.5 text-muted">
           {days > 0 ? (
             <>
@@ -62,17 +62,19 @@ export default function Home() {
   );
 }
 
+const DAY = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
 /** The last two weeks at a glance: one bar a day, taller for more answers. */
 function Activity({ activity, now }: { activity: Record<string, number>; now: number }) {
   const week = lastDays(activity, now, 14);
   const most = Math.max(1, ...week.map((d) => d.count));
   return (
-    <div className="flex h-5 items-end gap-[3px]" role="img" aria-label={`Answers per day over the last 14 days. Today: ${week[week.length - 1].count}.`}>
+    <div className="flex h-5 shrink-0 items-end gap-[3px]" role="img" aria-label={`Answers per day over the last 14 days. Today: ${week[week.length - 1].count}.`}>
       {week.map((d, i) => (
         <span
           key={d.key}
-          title={`${d.key}: ${plural(d.count, 'answer')}`}
-          className={cx('w-[5px] rounded-[1.5px]', i === week.length - 1 ? 'bg-fg' : d.count ? 'bg-fg/40' : 'bg-fg/[0.12]')}
+          title={`${DAY.format(new Date(`${d.key}T12:00`))}: ${plural(d.count, 'answer')}`}
+          className={cx('w-[5px] rounded-[1.5px]', i === week.length - 1 ? 'bg-fg' : d.count ? 'bg-fg/55' : 'bg-fg/[0.12]')}
           style={{ height: d.count ? `${Math.max(20, (d.count / most) * 100)}%` : 3 }}
         />
       ))}
@@ -86,7 +88,7 @@ function SetCard({ set, index, now }: { set: StudySet; index: number; now: numbe
   return (
     <li className="near group flex min-h-40 flex-col justify-between gap-6 rounded-2xl border border-line bg-surface p-5">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="line-clamp-2 font-serif text-[1.65rem] leading-[1.1] break-words">
+        <h2 className="line-clamp-2 font-serif text-[1.65rem] leading-[1.1] tracking-[-0.01em] text-balance break-words">
           {/* The whole card opens the set; the play button sits above this link. */}
           <Link to={`/set/${set.id}`} className="outline-none after:absolute after:inset-0 after:rounded-2xl focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-fg">
             {set.title}
@@ -98,7 +100,7 @@ function SetCard({ set, index, now }: { set: StudySet; index: number; now: numbe
         <div className="flex items-center gap-3">
           <Ring value={p.mastery} size={34} width={3.5} />
           <p className="label-mono text-muted">
-            {plural(set.cards.length, 'term')}
+            {plural(set.cards.length, 'card')}
             <br />
             {p.answers ? (
               <>
@@ -113,7 +115,7 @@ function SetCard({ set, index, now }: { set: StudySet; index: number; now: numbe
           <Link
             to={`/set/${set.id}/match`}
             aria-label={`Play ${set.title}`}
-            className={cx(btn({ icon: true }), 'relative z-10 -m-1 group-hover:bg-fg group-hover:text-bg')}
+            className={cx(btn({ icon: true }), 'relative z-10 -m-1 group-hover:bg-fg! group-hover:text-bg! hover:opacity-85')}
           >
             <Icon name="play" size={16} className="translate-x-px" />
           </Link>
@@ -136,8 +138,8 @@ function Welcome() {
       <h1 className="enter max-w-[11ch] font-serif text-[clamp(3.2rem,13vw,5.5rem)] leading-[0.95] tracking-[-0.015em]">
         Learn terms, <em>fast.</em>
       </h1>
-      <p className="enter mt-6 max-w-md text-[17px] leading-relaxed text-pretty text-muted" style={{ '--i': 1 } as CSSProperties}>
-        Paste a list of words and definitions, then match them against the clock or flip through them as cards. Titan keeps track of what you know and brings back what you miss.
+      <p className="enter mt-6 max-w-md text-lead leading-relaxed text-pretty text-muted" style={{ '--i': 1 } as CSSProperties}>
+        Paste a list of terms and definitions, then match them against the clock, flip through them or take a quiz. Titan keeps track of what you know and brings back what you miss.
       </p>
       <div className="enter mt-9 flex flex-wrap gap-3" style={{ '--i': 2 } as CSSProperties}>
         <Link to="/new" className={btn({ variant: 'primary', size: 'lg' })}>
@@ -146,7 +148,7 @@ function Welcome() {
           <Kbd on>N</Kbd>
         </Link>
         <Button size="lg" onClick={trySample}>
-          Try a sample
+          Try a sample set
           <Kbd>S</Kbd>
         </Button>
       </div>

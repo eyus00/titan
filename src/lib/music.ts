@@ -44,10 +44,10 @@ export const OWN_TRACK_LIMIT = 12;
 /** Add an audio file to the viewer's tracks and select it. Rejects when the browser can't play it. */
 export async function addOwnTrack(file: File) {
   const { ownTracks } = getState().settings;
-  if (ownTracks.length >= OWN_TRACK_LIMIT) throw new Error(`You can keep up to ${OWN_TRACK_LIMIT} of your own tracks.`);
-  if (file.size > TRACK_MAX_BYTES) throw new Error('That file is too large (30 MB at most).');
+  if (ownTracks.length >= OWN_TRACK_LIMIT) throw new Error(`You can keep up to ${OWN_TRACK_LIMIT} of your own tracks. Remove one to add another.`);
+  if (file.size > TRACK_MAX_BYTES) throw new Error('That file is over 30\u00a0MB. Choose a smaller one.');
   const seconds = await durationOf(file);
-  if (!Number.isFinite(seconds) || seconds <= 0) throw new Error("This browser can't play that file.");
+  if (!Number.isFinite(seconds) || seconds <= 0) throw new Error('This browser can’t play that file. Try an MP3 or WAV.');
   const id = `t${uid()}`;
   await idb('readwrite', (s) => s.put(file, id));
   actions.setSettings({ ownTracks: [...ownTracks, { id, name: file.name.replace(/\.[^.]+$/, '') }], track: `own:${id}` });

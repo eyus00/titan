@@ -47,6 +47,8 @@ export interface Settings {
   ownTracks: OwnTrack[];
   /** Which side flashcards show first. */
   front: 'term' | 'def';
+  /** Single-key shortcuts (N, M, W A S D ...). Off for people whose input types stray characters. */
+  shortcuts: boolean;
 }
 
 interface State {
@@ -68,6 +70,7 @@ const DEFAULT_SETTINGS: Settings = {
   track: 'orbit',
   ownTracks: [],
   front: 'term',
+  shortcuts: true,
 };
 
 // ---------- persistence ----------
@@ -140,6 +143,7 @@ function cleanSettings(raw: unknown): Settings {
   if (typeof r.music === 'boolean') s.music = r.music;
   if (typeof r.musicVolume === 'number') s.musicVolume = Math.min(1, Math.max(0, r.musicVolume));
   if (r.front === 'def') s.front = 'def';
+  if (typeof r.shortcuts === 'boolean') s.shortcuts = r.shortcuts;
   if (Array.isArray(r.ownTracks)) {
     s.ownTracks = r.ownTracks.map(obj).filter((t) => str(t.id) && str(t.name)).map((t) => ({ id: str(t.id), name: str(t.name) }));
   }

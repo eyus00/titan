@@ -51,7 +51,7 @@ export function Choice<T extends string | number>({
             title={o.title}
             onClick={() => onChange(o.value)}
             className={cx(
-              'relative inline-flex h-8 items-center rounded-full px-3 text-[13px] font-medium transition-[background-color,color,scale] duration-150 ease-out not-disabled:active:scale-[0.96] disabled:opacity-30',
+              'relative inline-flex h-8 items-center rounded-full px-3 text-caption font-medium transition-[background-color,color,scale] duration-150 ease-out not-disabled:active:scale-[0.96] disabled:opacity-30',
               on ? 'text-bg' : 'bg-fg/[0.07] text-muted hover:bg-fg/[0.13] hover:text-fg',
             )}
           >
@@ -73,13 +73,12 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={cx('group relative h-6 w-10 shrink-0 rounded-full transition-colors duration-150 ease-out', checked ? 'bg-fg' : 'bg-fg/[0.16]')}
+      className={cx('group relative h-6 w-10 shrink-0 rounded-full transition-[color,background-color,border-color] duration-150 ease-out', checked ? 'bg-fg' : 'bg-fg/[0.16]')}
     >
-      {/* The knob stretches a little under the press, toward where it is about to go. */}
       <span
         className={cx(
-          'absolute top-0.5 h-5 w-5 rounded-full transition-[left,width,background-color] duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-active:w-6',
-          checked ? 'left-[18px] bg-bg group-active:left-[14px]' : 'left-0.5 bg-fg/70',
+          'absolute top-0.5 left-0.5 size-5 rounded-full transition-[translate,scale,background-color] duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-active:scale-90',
+          checked ? 'translate-x-4 bg-bg' : 'bg-fg/70',
         )}
       />
     </button>
@@ -88,13 +87,15 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
 
 /** A labelled row in a settings list: text on the left, a control on the right. */
 export function Field({ title, hint, children, stack }: { title: string; hint?: ReactNode; children: ReactNode; stack?: boolean }) {
+  // A row with one switch is a <label>, so the whole row is its hit area.
+  const Row = stack ? 'div' : 'label';
   return (
-    <div className={cx('flex gap-x-4 gap-y-2.5 py-3.5', stack ? 'flex-col' : 'items-center justify-between')}>
-      <div className="min-w-0">
-        <div className="text-[15px]">{title}</div>
-        {hint && <div className="mt-0.5 text-[13px] text-pretty text-muted">{hint}</div>}
-      </div>
-      <div className={cx(!stack && 'shrink-0')}>{children}</div>
-    </div>
+    <Row className={cx('flex gap-x-4 gap-y-2.5 py-3.5', stack ? 'flex-col' : 'cursor-pointer items-center justify-between')}>
+      <span className="block min-w-0">
+        <span className="block text-body">{title}</span>
+        {hint && <span className="mt-0.5 block text-caption text-pretty text-muted">{hint}</span>}
+      </span>
+      <span className={cx('block', !stack && 'shrink-0')}>{children}</span>
+    </Row>
   );
 }

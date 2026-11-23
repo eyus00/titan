@@ -26,9 +26,9 @@ const VARIANT: Record<ButtonVariant, string> = {
 };
 
 const SIZE: Record<ButtonSize, { text: string; icon: string }> = {
-  sm: { text: 'h-8 px-3 text-[13px]', icon: 'size-8' },
+  sm: { text: 'h-8 px-3 text-caption', icon: 'size-8' },
   md: { text: 'h-10 px-4 text-sm', icon: 'size-10' },
-  lg: { text: 'h-12 px-5 text-[15px]', icon: 'size-12' },
+  lg: { text: 'h-12 px-5 text-body', icon: 'size-12' },
 };
 
 /** Class string, for links and anything else that should look like a button. */

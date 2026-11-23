@@ -1,6 +1,17 @@
 @import 'tailwindcss';
-@import '@fontsource/instrument-serif/latin-400.css';
-@import '@fontsource/instrument-serif/latin-400-italic.css';
+/* All subsets, each fetched only when a page uses its characters (so "ł" or "ě" in a title stay in the serif). */
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+
+/* A stand-in with the serif's proportions, so titles don't re-wrap when the real font arrives. */
+@font-face {
+  font-family: 'Instrument Serif Fallback';
+  src: local('Times New Roman'), local('Liberation Serif'), local('Times');
+  size-adjust: 83%;
+  ascent-override: 119%;
+  descent-override: 37%;
+  line-gap-override: 0%;
+}
 
 /* Keyboard cues and hover-only extras: only where there is a mouse or trackpad. */
 @custom-variant keys (@media (hover: hover) and (pointer: fine));
@@ -14,9 +25,12 @@
   --surface: #131316;
   --raised: #1c1c20;
   --line: #28282d;
+  /* The edge of something you type into: 3:1 against the page. */
+  --line-strong: #67676d;
   --fg: #ebe6dc;
   --muted: #a39d93;
-  --faint: #7f7a72;
+  /* Every text colour holds 4.5:1 on every surface it is used on, in both themes. */
+  --faint: #8d887f;
   --ok: #45d093;
   --bad: #ff6b66;
   color-scheme: dark;
@@ -27,11 +41,12 @@
   --surface: #f6f4f0;
   --raised: #ffffff;
   --line: #d6d2ca;
+  --line-strong: #86827b;
   --fg: #24211d;
-  --muted: #68635b;
-  --faint: #8b867d;
-  --ok: #0a8a5c;
-  --bad: #d23b36;
+  --muted: #5a564e;
+  --faint: #6b665e;
+  --ok: #036c47;
+  --bad: #c32b29;
   color-scheme: light;
 }
 
@@ -40,16 +55,22 @@
   --color-surface: var(--surface);
   --color-raised: var(--raised);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
   --color-ok: var(--ok);
   --color-bad: var(--bad);
-  --font-serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-serif: 'Instrument Serif', 'Instrument Serif Fallback', Georgia, 'Times New Roman', serif;
+  --text-caption: 0.8125rem;
+  --text-body: 0.9375rem;
+  --text-lead: 1.0625rem;
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* The app's one "physical" curve: quick out of the gate, long soft landing. */
   --ease-spring: cubic-bezier(0.2, 0, 0, 1);
+  /* State changes ease out, unless a transition says otherwise. */
+  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
 }
 
 @layer base {
@@ -61,6 +82,10 @@
   body {
     @apply bg-bg font-sans text-fg antialiased;
     min-height: 100dvh;
+  }
+  /* The editor's save bar is fixed to the bottom: a field that takes focus must not land behind it. */
+  html:has([data-savebar]) {
+    scroll-padding-block-end: 6.5rem;
   }
   /* A game takes the whole screen: nothing behind it can scroll or bounce. */
   html.game,
@@ -101,6 +126,7 @@
   font-size: 0.75rem;
   line-height: 1.4;
   letter-spacing: 0.01em;
+  text-transform: lowercase;
 }
 
 @utility no-scrollbar {
@@ -141,7 +167,7 @@
 .card-text {
   display: block;
   width: 100%;
-  line-height: 1.3;
+  line-height: 1.35;
   white-space: pre-line;
   overflow-wrap: anywhere;
   text-wrap: balance;
@@ -177,10 +203,9 @@
   border-color: var(--ok);
   background: color-mix(in srgb, var(--ok) 9%, var(--surface));
   opacity: 0;
-  scale: 0.95;
   pointer-events: none;
-  transition-duration: 320ms;
-  transition-delay: 60ms;
+  /* The green shows at once; the card then fades. An exit, so shorter than the deal-in. */
+  transition-delay: 0ms, 0ms, 0ms, 0ms, 100ms, 100ms;
 }
 /* The keyboard's cursor on the board. */
 .tile:focus-visible {
@@ -244,7 +269,12 @@
   animation-delay: calc(var(--i, 0) * var(--stagger, 100ms));
 }
 .tile-in {
-  --stagger: 24ms;
+  animation-duration: 220ms;
+  --stagger: 10ms;
+}
+/* Something seen every few seconds (the next quiz question): one quick fade, nothing staged. */
+.swap {
+  animation: fade 150ms ease-out both;
 }
 .page {
   animation: fade 220ms ease-out both;
@@ -257,6 +287,9 @@
   .enter,
   .tile-in {
     animation-name: rise;
+  }
+  .tile-matched {
+    scale: 0.95;
   }
   .tile-shake {
     animation: shake 380ms ease-out;
@@ -271,6 +304,6 @@
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    transition-property: opacity, color, background-color, border-color, box-shadow, stroke-dashoffset, stroke-dasharray !important;
+    transition-property: opacity, color, background-color, border-color, box-shadow !important;
   }
 }

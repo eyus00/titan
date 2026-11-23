@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { btn } from '../components/Button';
 import DeckDone from '../components/DeckDone';
@@ -27,8 +27,8 @@ export default function Quiz() {
   if (cards.length < 2) {
     return (
       <div className="page mx-auto flex min-h-dvh max-w-3xl flex-col items-start justify-center px-5 pb-[12vh] sm:px-8">
-        <h1 className="font-serif text-5xl leading-none text-balance">Not enough cards yet.</h1>
-        <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-pretty text-muted">A quiz needs at least two cards with both a term and a definition.</p>
+        <h1 className="font-serif text-5xl leading-none tracking-[-0.01em] text-balance">Not enough cards yet.</h1>
+        <p className="mt-4 max-w-sm text-body leading-relaxed text-pretty text-muted">A quiz needs at least two cards with both a term and a definition.</p>
         <Link to={`/set/${set.id}/edit`} className={btn({ variant: 'primary' }) + ' mt-7'}>
           Edit this set
         </Link>
@@ -58,7 +58,7 @@ function choicesFor(card: Card, cards: Card[], mix: string | undefined): Card[] 
 function Session({ set, cards }: { set: StudySet; cards: Card[] }) {
   const navigate = useNavigate();
   const sound = useStore((s) => s.settings.sfx);
-  useTitle(set.title);
+  useTitle(`Quiz · ${set.title}`);
   useGameScreen();
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
@@ -75,6 +75,7 @@ function Session({ set, cards }: { set: StudySet; cards: Card[] }) {
   const before = useRef(progress(cards, set.stats, Date.now()).mastery);
   const timer = useRef(0);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  const question = useRef<HTMLHeadingElement>(null);
 
   const card = queue.length ? byId.get(queue[0]) : undefined;
   const total = known + new Set(queue).size;
@@ -82,6 +83,10 @@ function Session({ set, cards }: { set: StudySet; cards: Card[] }) {
   const options = useMemo(() => (card ? choicesFor(card, cards, stats()[card.id]?.mix) : []), [card?.id, queue.length, known]); // eslint-disable-line react-hooks/exhaustive-deps
   const leave = useCallback(() => navigate(`/set/${set.id}`), [navigate, set.id]);
   const correct = picked !== null && picked === card?.id;
+  // Each new question takes focus (answering disables the option that had it).
+  useEffect(() => {
+    if (picked === null) question.current?.focus({ preventScroll: true });
+  }, [card?.id, known, queue.length, picked]);
 
   const next = () => {
     if (!card || picked === null) return;
@@ -136,23 +141,25 @@ function Session({ set, cards }: { set: StudySet; cards: Card[] }) {
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-bg">
-      <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center px-2 sm:px-4" style={{ marginTop: 'env(safe-area-inset-top)' }}>
+      <header className="grid h-14 shrink-0 grid-cols-[1fr_minmax(0,14rem)_1fr] items-center pr-[max(0.5rem,env(safe-area-inset-right))] pl-[max(0.5rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] sm:pl-[max(1rem,env(safe-area-inset-left))]" style={{ marginTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center">
-          <button type="button" onClick={leave} aria-label="Leave the quiz" className={btn({ variant: 'ghost', icon: true })}>
+          <button type="button" onClick={leave} aria-label="Leave quiz" className={btn({ variant: 'ghost', icon: true })}>
             <Icon name="close" size={20} />
           </button>
         </div>
-        <div className="flex w-40 flex-col items-center gap-1.5 sm:w-56">
+        <div className="flex w-full flex-col items-center gap-1.5 px-2">
           <span className="label-mono text-muted tabular-nums">
             {known} / {total}
           </span>
-          <div className="h-[3px] w-full overflow-hidden rounded-full bg-fg/[0.1]" role="progressbar" aria-label="Questions answered" aria-valuemin={0} aria-valuemax={total} aria-valuenow={known}>
+          <div className="h-[3px] w-full overflow-hidden rounded-full bg-fg/[0.1]" role="progressbar" aria-label="Questions answered correctly" aria-valuemin={0} aria-valuemax={total} aria-valuenow={known}>
             <div className="h-full origin-left rounded-full bg-fg transition-transform duration-500 ease-[cubic-bezier(0.2,0,0,1)]" style={{ transform: `scaleX(${total ? known / total : 0})` }} />
           </div>
         </div>
         <div className="flex items-center justify-end">
-          <button type="button" onClick={() => setAsks((a) => (a === 'term' ? 'def' : 'term'))} disabled={picked !== null} title="Ask for the other side (T)" className={cx(btn({ variant: 'ghost', size: 'sm' }), 'label-mono')}>
-            {asks === 'term' ? 'name the term' : 'pick the definition'}
+          {/* Words where there is room, an icon on phones. */}
+          <button type="button" onClick={() => setAsks((a) => (a === 'term' ? 'def' : 'term'))} disabled={picked !== null} title="Ask for the other side (T)" className={cx(btn({ variant: 'ghost', size: 'sm' }), 'label-mono max-sm:size-10 max-sm:px-0')}>
+            <Icon name="flip" size={20} className="sm:hidden" />
+            <span className="max-sm:sr-only">{asks === 'term' ? 'pick the term' : 'pick the definition'}</span>
           </button>
           <button type="button" onClick={() => actions.setSettings({ sfx: !sound })} aria-label="Sound effects" aria-pressed={sound} title={`Sound effects ${sound ? 'on' : 'off'} (N)`} className={btn({ variant: 'ghost', icon: true })}>
             <Icon name={sound ? 'sound' : 'soundOff'} size={20} />
@@ -163,11 +170,14 @@ function Session({ set, cards }: { set: StudySet; cards: Card[] }) {
       {card ? (
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-8">
           {/* Keyed by question, so each one arrives fresh. */}
-          <div key={`${card.id}:${known}:${queue.length}`} className="m-auto flex w-full max-w-2xl flex-col py-4">
-            <p className="enter label-mono text-faint">{asks === 'term' ? 'which term is this?' : 'which definition fits?'}</p>
-            <h1 className={cx('enter mt-3 text-balance break-words whitespace-pre-line', asks === 'term' ? 'text-[clamp(1.15rem,3.6vw,1.6rem)] leading-snug' : 'font-serif text-[clamp(2.2rem,8vw,3.4rem)] leading-none tracking-[-0.01em]')}>{prompt}</h1>
+          <div key={`${card.id}:${known}:${queue.length}`} className="swap m-auto flex w-full max-w-2xl flex-col py-4">
+            <p className="label-mono text-faint">{asks === 'term' ? 'which term is this?' : 'which definition fits?'}</p>
+            {/* The question takes focus as it arrives, so it is read out and the keyboard starts from it. */}
+            <h1 ref={question} tabIndex={-1} className={cx('mt-3 text-balance break-words whitespace-pre-line outline-none', asks === 'term' ? 'text-[clamp(1.15rem,3.6vw,1.6rem)] leading-normal' : 'font-serif text-[clamp(2.2rem,8vw,3.4rem)] leading-[1.05] tracking-[-0.01em]')}>
+              {prompt}
+            </h1>
 
-            <div className={cx('enter mt-8 grid gap-2.5', asks === 'term' && 'sm:grid-cols-2')} style={{ '--i': 1 } as CSSProperties} role="group" aria-label="Answers">
+            <div className={cx('mt-8 grid gap-2.5', asks === 'term' && 'sm:grid-cols-2')} role="group" aria-label="Answers">
               {options.map((o, i) => {
                 const isRight = picked !== null && o.id === card.id;
                 const isWrong = picked === o.id && o.id !== card.id;
@@ -178,14 +188,14 @@ function Session({ set, cards }: { set: StudySet; cards: Card[] }) {
                     onClick={() => answer(o)}
                     disabled={picked !== null}
                     className={cx(
-                      'tile flex min-h-14 items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] leading-snug disabled:cursor-default',
+                      'tile flex min-h-14 items-center gap-3 rounded-2xl px-4 py-3 text-left text-body leading-normal disabled:cursor-default',
                       isRight && 'tile-right',
                       isWrong && 'tile-wrong tile-shake',
                       picked !== null && !isRight && !isWrong && 'opacity-45',
                     )}
                   >
                     <span className="min-w-0 flex-1 break-words whitespace-pre-line">{face(o)}</span>
-                    {isRight ? <Icon name="check" size={16} stroke={2} className="text-ok" /> : isWrong ? <Icon name="close" size={16} stroke={2} className="text-bad" /> : <Kbd>{i + 1}</Kbd>}
+                    {isRight ? <Icon name="check" size={16} className="text-ok" /> : isWrong ? <Icon name="close" size={16} className="text-bad" /> : <Kbd>{i + 1}</Kbd>}
                   </button>
                 );
               })}
@@ -194,7 +204,9 @@ function Session({ set, cards }: { set: StudySet; cards: Card[] }) {
             <div className="mt-6 flex h-12 items-center justify-between gap-4" aria-live="polite">
               {picked !== null && !correct && (
                 <>
-                  <p className="text-sm text-pretty text-muted">Not quite. It will come back in a moment.</p>
+                  <p className="min-w-0 text-sm text-pretty text-muted">
+                    Not quite. The answer is <span className="text-fg">{face(card)}</span>.
+                  </p>
                   <button type="button" onClick={next} autoFocus className={btn({ variant: 'primary' })}>
                     Next
                     <Kbd on>↵</Kbd>

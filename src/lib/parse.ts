@@ -179,7 +179,7 @@ export function detect(text: string): Pick<ParseOptions, 'termSep' | 'cardSep'> 
 export function placeholder(opts: ParseOptions) {
   const between = opts.termSep === 'custom' ? unescape(opts.termCustom) || ' … ' : TERM_SEPS.find((s) => s.id === opts.termSep)!.sample;
   const after = opts.cardSep === 'custom' ? unescape(opts.cardCustom) || '\n' : CARD_SEPS.find((s) => s.id === opts.cardSep)!.sample;
-  return ['Word 1', 'Word 2', 'Word 3'].map((w, i) => `${w}${between}Definition ${i + 1}`).join(after);
+  return ['Term 1', 'Term 2', 'Term 3'].map((w, i) => `${w}${between}Definition ${i + 1}`).join(after);
 }
 
 /** Cards as text, one per line with a tab between the sides (pastes straight into other study tools). */
