@@ -8,13 +8,14 @@ import { cx } from '../lib/util';
  * - ghost: nothing until hovered. Icons in toolbars.
  * - danger: for the confirm step of deleting something.
  * Sizes: sm = 32px, md = 40px, lg = 48px. `icon` makes it a circle for icon-only buttons.
+ * Every button gives a little under the press (scale 0.96).
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const BASE =
   'inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap select-none ' +
-  'transition-[background-color,color,opacity] duration-150 ease-out ' +
+  'transition-[background-color,color,opacity,scale] duration-150 ease-out not-disabled:active:scale-[0.96] ' +
   'disabled:pointer-events-none disabled:opacity-35 aria-disabled:pointer-events-none aria-disabled:opacity-35';
 
 const VARIANT: Record<ButtonVariant, string> = {
@@ -27,7 +28,7 @@ const VARIANT: Record<ButtonVariant, string> = {
 const SIZE: Record<ButtonSize, { text: string; icon: string }> = {
   sm: { text: 'h-8 px-3 text-[13px]', icon: 'size-8' },
   md: { text: 'h-10 px-4 text-sm', icon: 'size-10' },
-  lg: { text: 'h-12 px-6 text-[15px]', icon: 'size-12' },
+  lg: { text: 'h-12 px-5 text-[15px]', icon: 'size-12' },
 };
 
 /** Class string, for links and anything else that should look like a button. */

@@ -2,6 +2,9 @@
 @import '@fontsource/instrument-serif/latin-400.css';
 @import '@fontsource/instrument-serif/latin-400-italic.css';
 
+/* Keyboard cues and hover-only extras: only where there is a mouse or trackpad. */
+@custom-variant keys (@media (hover: hover) and (pointer: fine));
+
 /*
  * Theme: flat colours only. Dark is a warm near-black with off-white text; light swaps them.
  * Everything else (lines, hover fills) is the text colour at different strengths.
@@ -45,7 +48,8 @@
   --font-serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The app's one "physical" curve: quick out of the gate, long soft landing. */
+  --ease-spring: cubic-bezier(0.2, 0, 0, 1);
 }
 
 @layer base {
@@ -57,6 +61,12 @@
   body {
     @apply bg-bg font-sans text-fg antialiased;
     min-height: 100dvh;
+  }
+  /* A game takes the whole screen: nothing behind it can scroll or bounce. */
+  html.game,
+  html.game body {
+    overflow: hidden;
+    overscroll-behavior: none;
   }
   ::selection {
     background: color-mix(in srgb, var(--fg) 24%, transparent);
@@ -79,8 +89,8 @@
   input[type='range'] {
     accent-color: var(--fg);
   }
-  /* Icon lines keep the same weight at any icon size. */
-  svg.lucide :where(path, line, polyline, polygon, circle, rect, ellipse) {
+  /* Icon lines keep their weight at any icon size. */
+  svg.icon :where(path, line, polyline, polygon, circle, rect, ellipse) {
     vector-effect: non-scaling-stroke;
   }
 }
@@ -100,6 +110,28 @@
   }
 }
 
+/* ---------- cards that react to the pointer together (lib/proximity.ts) ---------- */
+
+/*
+ * A soft highlight laid over the card, as strong as the pointer is near (--near, 0..1). It comes
+ * up fast and fades slowly, so neighbours glow as the pointer approaches and a trail lingers
+ * behind it. Only opacity animates.
+ */
+.near {
+  position: relative;
+}
+.near::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--fg) 52%, transparent);
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  opacity: var(--near, 0);
+  transition: opacity var(--near-ms, 900ms) ease-out;
+  pointer-events: none;
+}
+
 /* ---------- match cards ---------- */
 
 /*
@@ -115,58 +147,70 @@
   text-wrap: balance;
 }
 
-@keyframes tile-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.96);
-  }
+.tile {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  transition-property: background-color, border-color, box-shadow, translate, scale, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
 }
-.tile-in {
-  animation: tile-in 0.36s var(--ease-out-soft) backwards;
+.tile:not(:disabled):active {
+  scale: 0.97;
+}
+/* Picked up: lifted a little, with a firm edge. Never a full inversion. */
+.tile[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--fg) 80%, transparent);
+  background: color-mix(in srgb, var(--fg) 9%, var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 80%, transparent);
+  translate: 0 -2px;
+}
+.tile-wrong {
+  border-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 9%, var(--surface));
+}
+.tile-matched {
+  border-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 9%, var(--surface));
+  opacity: 0;
+  scale: 0.95;
+  pointer-events: none;
+  transition-duration: 320ms;
+  transition-delay: 60ms;
+}
+/* The keyboard's cursor on the board. */
+.tile:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
 }
 
-@keyframes tile-shake {
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+}
+@keyframes shake {
   0%,
   100% {
     transform: translateX(0);
   }
-  18% {
-    transform: translateX(-7px);
+  20% {
+    transform: translateX(-5px);
   }
-  38% {
-    transform: translateX(6px);
+  45% {
+    transform: translateX(4px);
   }
-  58% {
-    transform: translateX(-4px);
-  }
-  78% {
-    transform: translateX(2px);
+  70% {
+    transform: translateX(-2px);
   }
 }
-.tile-wrong {
-  animation: tile-shake 0.42s ease-out;
-}
-
-@keyframes tile-out {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  30% {
-    opacity: 1;
-    transform: scale(1.035);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-}
-.tile-matched {
-  opacity: 0;
-  pointer-events: none;
-  animation: tile-out 0.4s ease-out backwards;
-}
-
 /* "+1s" drifting up beside the clock after a wrong pair. */
 @keyframes penalty {
   0% {
@@ -185,37 +229,44 @@
     transform: translateY(-10px);
   }
 }
+
+/*
+ * One-time entrances. The hidden state lives in the `from` keyframe, so anything whose animation
+ * never runs is simply visible. With reduced motion only the fade remains.
+ */
+.enter,
+.tile-in {
+  animation: fade 300ms ease-out both;
+  animation-delay: calc(var(--i, 0) * var(--stagger, 100ms));
+}
+.tile-in {
+  --stagger: 24ms;
+}
+.page {
+  animation: fade 220ms ease-out both;
+}
 .penalty {
-  animation: penalty 0.9s ease-out forwards;
+  animation: fade 900ms ease-out reverse both;
 }
 
-/* ---------- shared motion ---------- */
-
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+@media (prefers-reduced-motion: no-preference) {
+  .enter,
+  .tile-in {
+    animation-name: rise;
   }
-}
-.rise-in {
-  animation: rise-in 0.3s var(--ease-out-soft) backwards;
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
+  .tile-shake {
+    animation: shake 380ms ease-out;
   }
-}
-.fade-in {
-  animation: fade-in 0.2s ease-out backwards;
+  .penalty {
+    animation: penalty 900ms ease-out both;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation: none !important;
-    transition-property: opacity, color, background-color, border-color !important;
     scroll-behavior: auto !important;
+    transition-property: opacity, color, background-color, border-color, box-shadow, stroke-dashoffset, stroke-dasharray !important;
   }
 }

@@ -153,6 +153,24 @@ const SOUNDS = {
       tone(c, out, { freq: 300 + i * 14, at, dur: 0.035, gain: 0.035 });
     }
   },
+  /** The keyboard cursor stepping to another card: barely there. */
+  move(c: AudioContext, out: AudioNode) {
+    tone(c, out, { freq: 900, dur: 0.03, gain: 0.03 });
+  },
+  /** A flashcard turning over. */
+  flip(c: AudioContext, out: AudioNode) {
+    noise(c, out, 0, 0.07, 0.035, 'bandpass', 1400);
+    tone(c, out, { freq: 330, to: 520, dur: 0.08, gain: 0.07 });
+  },
+  /** Flashcard marked as known. */
+  know(c: AudioContext, out: AudioNode) {
+    bell(c, out, 659.25, 0, 0.26, 0.13);
+    bell(c, out, 987.77, 0.06, 0.34, 0.11);
+  },
+  /** Flashcard marked for another pass: neutral, not a scolding. */
+  again(c: AudioContext, out: AudioNode) {
+    tone(c, out, { type: 'triangle', freq: 300, to: 240, dur: 0.14, gain: 0.14 });
+  },
   /** Board cleared. */
   win(c: AudioContext, out: AudioNode) {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => bell(c, out, f, i * 0.09, 0.5, 0.16));

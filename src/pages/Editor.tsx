@@ -1,10 +1,13 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type Ref, type TextareaHTMLAttributes } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router';
-import { ArrowLeft, ListPlus, Plus, X } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
 import Button, { btn } from '../components/Button';
+import Icon from '../components/Icon';
 import ImportDialog from '../components/ImportDialog';
+import Kbd, { MOD } from '../components/Kbd';
 import { Confirm } from '../components/Modal';
 import { toast } from '../components/Toast';
+import { useHotkeys } from '../lib/hotkeys';
 import type { ParsedCard } from '../lib/parse';
 import { actions, useStore, type StudySet } from '../lib/store';
 import { cx, plural, uid, useTitle } from '../lib/util';
@@ -87,25 +90,19 @@ function Form({ set }: { set?: StudySet }) {
     }
   };
 
-  // Cmd/Ctrl + S saves.
-  const saveRef = useRef(save);
-  saveRef.current = save;
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        saveRef.current();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  useHotkeys(set ? 'Editing' : 'New set', [
+    { keys: ['mod+s'], label: set ? 'Save changes' : 'Create the set', inFields: true, run: save },
+    { keys: ['mod+i'], label: 'Import a list', inFields: true, run: () => setImporting(true) },
+    { keys: ['mod+Enter'], label: 'Add a card', inFields: true, run: add },
+    { keys: ['Escape'], label: 'Leave without saving', run: () => navigate(back) },
+  ]);
 
   return (
     <>
-      <Link to={back} className="label-mono mt-6 inline-flex w-fit items-center gap-1.5 rounded py-1 text-muted transition-colors hover:text-fg sm:mt-9">
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
+      <Link to={back} className="label-mono mt-6 inline-flex w-fit items-center gap-1.5 rounded py-1 text-muted transition-colors duration-150 hover:text-fg sm:mt-9">
+        <Icon name="back" size={14} />
         {set ? 'back to set' : 'sets'}
+        <Kbd className="ml-1">Esc</Kbd>
       </Link>
 
       <input
@@ -124,8 +121,10 @@ function Form({ set }: { set?: StudySet }) {
       <div className="mt-6 flex items-center justify-between gap-3">
         <p className="label-mono text-muted">{plural(filled.length, 'card')}</p>
         <Button onClick={() => setImporting(true)}>
-          <ListPlus className="size-4" strokeWidth={1.75} />
+          <Icon name="list" size={16} stroke={2} />
           Import a list
+          <Kbd>{MOD}</Kbd>
+          <Kbd className="-ml-1">I</Kbd>
         </Button>
       </div>
 
@@ -140,7 +139,7 @@ function Form({ set }: { set?: StudySet }) {
         onClick={add}
         className="mt-2.5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-line text-sm text-muted transition-colors hover:border-fg/30 hover:text-fg"
       >
-        <Plus className="size-4" />
+        <Icon name="plus" size={16} />
         Add a card
       </button>
 
@@ -148,27 +147,37 @@ function Form({ set }: { set?: StudySet }) {
       <div className="h-24" />
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/90 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-end gap-2 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8">
-          <span className="label-mono mr-auto hidden text-faint sm:block">tab from the last definition adds a card</span>
+          <span className="label-mono mr-auto hidden items-center gap-1.5 text-faint keys:flex">
+            <Kbd>Tab</Kbd>
+            from the last definition adds a card
+          </span>
           <Link to={back} className={btn()}>
             Cancel
           </Link>
           <Button variant="primary" onClick={save}>
             {set ? 'Save changes' : 'Create set'}
+            <Kbd on>{MOD}</Kbd>
+            <Kbd on className="-ml-1">
+              S
+            </Kbd>
           </Button>
         </div>
       </div>
 
-      {importing && <ImportDialog onImport={onImport} onClose={() => setImporting(false)} />}
-      {blocker.state === 'blocked' && (
-        <Confirm
-          title="Discard changes?"
-          body="What you changed on this page hasn't been saved."
-          action="Discard"
-          danger
-          onConfirm={() => blocker.proceed()}
-          onClose={() => blocker.reset()}
-        />
-      )}
+      <AnimatePresence>
+        {importing && <ImportDialog key="import" onImport={onImport} onClose={() => setImporting(false)} />}
+        {blocker.state === 'blocked' && (
+          <Confirm
+            key="discard"
+            title="Discard changes?"
+            body="What you changed on this page hasn't been saved."
+            action="Discard"
+            danger
+            onConfirm={() => blocker.proceed()}
+            onClose={() => blocker.reset()}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -222,7 +231,7 @@ const RowEditor = memo(function RowEditor({
         tabIndex={-1}
         className={cx(btn({ variant: 'ghost', icon: true, size: 'sm' }), 'col-start-2 row-start-1 mt-0.5 text-faint sm:col-start-4')}
       >
-        <X className="size-4" />
+        <Icon name="close" size={16} />
       </button>
     </li>
   );

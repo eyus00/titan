@@ -1,7 +1,11 @@
-import type { ReactNode } from 'react';
+import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { m } from 'motion/react';
 import { cx } from '../lib/util';
 
-/** A row of pills where exactly one is chosen (theme, separators, pairs per round). */
+/**
+ * A row of pills where exactly one is chosen (theme, separators, pairs per round). The filled
+ * pill slides from the old choice to the new one. Arrow keys move the choice, as in any radio group.
+ */
 export function Choice<T extends string | number>({
   value,
   options,
@@ -10,13 +14,30 @@ export function Choice<T extends string | number>({
   className,
 }: {
   value: T;
-  options: readonly { value: T; label: ReactNode; disabled?: boolean }[];
+  options: readonly { value: T; label: ReactNode; disabled?: boolean; title?: string }[];
   onChange: (value: T) => void;
   label: string;
   className?: string;
 }) {
+  const id = useId();
+  const group = useRef<HTMLDivElement>(null);
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    const usable = options.filter((o) => !o.disabled);
+    const at = usable.findIndex((o) => o.value === value);
+    const next = usable[(at + step + usable.length) % usable.length];
+    if (!next) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onChange(next.value);
+    // Focus follows the choice.
+    requestAnimationFrame(() => group.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
+  };
+
   return (
-    <div role="radiogroup" aria-label={label} className={cx('flex flex-wrap gap-1.5', className)}>
+    <div ref={group} role="radiogroup" aria-label={label} onKeyDown={onKeyDown} className={cx('flex flex-wrap gap-1.5', className)}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -25,14 +46,17 @@ export function Choice<T extends string | number>({
             type="button"
             role="radio"
             aria-checked={on}
+            tabIndex={on ? 0 : -1}
             disabled={o.disabled}
+            title={o.title}
             onClick={() => onChange(o.value)}
             className={cx(
-              'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors duration-150 disabled:opacity-30',
-              on ? 'bg-fg text-bg' : 'bg-fg/[0.07] text-muted hover:bg-fg/[0.13] hover:text-fg',
+              'relative inline-flex h-8 items-center rounded-full px-3 text-[13px] font-medium transition-[background-color,color,scale] duration-150 ease-out not-disabled:active:scale-[0.96] disabled:opacity-30',
+              on ? 'text-bg' : 'bg-fg/[0.07] text-muted hover:bg-fg/[0.13] hover:text-fg',
             )}
           >
-            {o.label}
+            {on && <m.span layoutId={id} className="absolute inset-0 rounded-full bg-fg" transition={{ type: 'spring', duration: 0.4, bounce: 0 }} />}
+            <span className="relative inline-flex items-center gap-1.5">{o.label}</span>
           </button>
         );
       })}
@@ -49,9 +73,15 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={cx('relative h-6 w-10 shrink-0 rounded-full transition-colors duration-150', checked ? 'bg-fg' : 'bg-fg/[0.16]')}
+      className={cx('group relative h-6 w-10 shrink-0 rounded-full transition-colors duration-150 ease-out', checked ? 'bg-fg' : 'bg-fg/[0.16]')}
     >
-      <span className={cx('absolute top-0.5 left-0.5 size-5 rounded-full transition-transform duration-150 ease-out', checked ? 'translate-x-4 bg-bg' : 'bg-fg/70')} />
+      {/* The knob stretches a little under the press, toward where it is about to go. */}
+      <span
+        className={cx(
+          'absolute top-0.5 h-5 w-5 rounded-full transition-[left,width,background-color] duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-active:w-6',
+          checked ? 'left-[18px] bg-bg group-active:left-[14px]' : 'left-0.5 bg-fg/70',
+        )}
+      />
     </button>
   );
 }

@@ -27,6 +27,14 @@ export function formatTime(ms: number) {
 /** Same, with the unit, for running text: "8.4s", "1:08.4". */
 export const formatDuration = (ms: number) => (ms < 60_000 ? `${formatTime(ms)}s` : formatTime(ms));
 
+/** A whole-seconds clock for long sessions: "0:42", "12:05". */
+export function formatClock(ms: number) {
+  const s = Math.floor(Math.max(0, ms) / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export const percent = (v: number) => `${Math.round(v * 100)}%`;
+
 export const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
 export function useTitle(title?: string) {
@@ -35,7 +43,13 @@ export function useTitle(title?: string) {
   }, [title]);
 }
 
-export const prefersReducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** While mounted, the page is a full-screen game: the document behind it can't scroll or bounce. */
+export function useGameScreen() {
+  useEffect(() => {
+    document.documentElement.classList.add('game');
+    return () => document.documentElement.classList.remove('game');
+  }, []);
+}
 
 /** Save text as a file from the browser. */
 export function download(name: string, text: string, type = 'text/plain') {
@@ -46,6 +60,3 @@ export function download(name: string, text: string, type = 'text/plain') {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-
-/** A file-system-safe name from a title. */
-export const slug = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'set';

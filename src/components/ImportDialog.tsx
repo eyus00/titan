@@ -1,9 +1,11 @@
 import { useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
-import { FileUp } from 'lucide-react';
 import Button from './Button';
 import { Choice } from './Controls';
+import Icon from './Icon';
+import Kbd, { MOD } from './Kbd';
 import { Dialog } from './Modal';
 import { toast } from './Toast';
+import { useHotkeys } from '../lib/hotkeys';
 import { CARD_SEPS, DEFAULT_OPTIONS, TERM_SEPS, detect, parseList, placeholder, type ParseOptions, type ParsedCard } from '../lib/parse';
 import { cx, plural } from '../lib/util';
 
@@ -25,6 +27,8 @@ export default function ImportDialog({ onImport, onClose }: { onImport: (cards: 
 
   const cards = useMemo(() => parseList(text, opts), [text, opts]);
   const incomplete = cards.filter((c) => !c.term || !c.def).length;
+
+  useHotkeys('Import', [{ keys: ['mod+Enter'], label: 'Import the cards', inFields: true, inDialog: true, when: cards.length > 0, run: () => onImport(cards, fileName) }]);
 
   const change = (next: string) => {
     setText(next);
@@ -77,6 +81,10 @@ export default function ImportDialog({ onImport, onClose }: { onImport: (cards: 
           <Button onClick={onClose}>Cancel</Button>
           <Button variant="primary" disabled={!cards.length} onClick={() => onImport(cards, fileName)}>
             Import{cards.length ? ` ${cards.length}` : ''}
+            <Kbd on>{MOD}</Kbd>
+            <Kbd on className="-ml-1">
+              ↵
+            </Kbd>
           </Button>
         </>
       }
@@ -91,7 +99,7 @@ export default function ImportDialog({ onImport, onClose }: { onImport: (cards: 
         onDrop={onDrop}
       >
         <textarea
-          autoFocus
+          data-autofocus
           value={text}
           onChange={(e) => change(e.target.value)}
           onKeyDown={onKeyDown}
@@ -107,9 +115,9 @@ export default function ImportDialog({ onImport, onClose }: { onImport: (cards: 
         <button
           type="button"
           onClick={() => fileInput.current?.click()}
-          className="label-mono absolute right-2.5 bottom-2.5 inline-flex h-7 items-center gap-1.5 rounded-full bg-surface px-2.5 text-muted ring-1 ring-line transition-colors hover:text-fg"
+          className="label-mono absolute right-2.5 bottom-2.5 inline-flex h-7 items-center gap-1.5 rounded-full bg-surface px-2.5 text-muted ring-1 ring-line transition-[color,scale] duration-150 ease-out hover:text-fg active:scale-[0.96]"
         >
-          <FileUp className="size-3.5" strokeWidth={1.75} />
+          <Icon name="file" size={14} />
           open file
         </button>
       </div>

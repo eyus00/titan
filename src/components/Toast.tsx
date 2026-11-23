@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { AnimatePresence, m } from 'motion/react';
 
 interface ToastItem {
   id: number;
@@ -41,30 +42,35 @@ export function Toaster() {
 
   return (
     <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[110] flex justify-center px-4">
-      {t && (
-        <div
-          key={t.id}
-          role="status"
-          className="rise-in pointer-events-auto flex max-w-md min-w-0 items-center gap-3 rounded-full border border-line bg-raised py-1.5 pr-1.5 pl-5 text-sm text-fg shadow-xl shadow-black/20"
-          onPointerEnter={() => setHeld(true)}
-          onPointerLeave={() => setHeld(false)}
-          onFocus={() => setHeld(true)}
-          onBlur={() => setHeld(false)}
-        >
-          <span className="min-w-0 truncate py-1.5 pr-3">{t.message}</span>
-          {t.action && (
-            <button
-              onClick={() => {
-                t.action!.run();
-                dismiss(t.id);
-              }}
-              className="-ml-2 shrink-0 rounded-full bg-fg px-3 py-1.5 text-xs font-semibold text-bg transition hover:opacity-85"
-            >
-              {t.action.label}
-            </button>
-          )}
-        </div>
-      )}
+      <AnimatePresence mode="popLayout">
+        {t && (
+          <m.div
+            key={t.id}
+            role="status"
+            initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.25, ease: 'easeOut' } }}
+            exit={{ opacity: 0, y: 8, filter: 'blur(4px)', transition: { duration: 0.15, ease: 'easeOut' } }}
+            className="pointer-events-auto flex max-w-md min-w-0 items-center gap-3 rounded-full border border-line bg-raised py-1.5 pr-1.5 pl-5 text-sm text-fg shadow-xl shadow-black/20"
+            onPointerEnter={() => setHeld(true)}
+            onPointerLeave={() => setHeld(false)}
+            onFocus={() => setHeld(true)}
+            onBlur={() => setHeld(false)}
+          >
+            <span className="min-w-0 truncate py-1.5 pr-3">{t.message}</span>
+            {t.action && (
+              <button
+                onClick={() => {
+                  t.action!.run();
+                  dismiss(t.id);
+                }}
+                className="-ml-2 shrink-0 rounded-full bg-fg px-3 py-1.5 text-xs font-semibold text-bg transition-[opacity,scale] duration-150 ease-out hover:opacity-85 active:scale-[0.96]"
+              >
+                {t.action.label}
+              </button>
+            )}
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
