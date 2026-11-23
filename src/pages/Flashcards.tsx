@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Ref } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Ref } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { AnimatePresence, m, useMotionValue, useTransform } from 'motion/react';
 import Button, { btn } from '../components/Button';
 import Icon from '../components/Icon';
 import Kbd from '../components/Kbd';
-import { Count, Ring } from '../components/Ring';
+import DeckDone from '../components/DeckDone';
+import { Ring } from '../components/Ring';
 import Shortcuts from '../components/Shortcuts';
 import { sfx } from '../lib/audio';
 import { fitText } from '../lib/fit';
 import { useHotkeys } from '../lib/hotkeys';
 import { mastery, progress, rank, type CardStat } from '../lib/learn';
 import { actions, getState, playable, useStore, type Card, type StudySet } from '../lib/store';
-import { cx, plural, useGameScreen, useTitle } from '../lib/util';
+import { cx, useGameScreen, useTitle } from '../lib/util';
 import NotFound from './NotFound';
 
 export default function Flashcards() {
@@ -205,7 +206,7 @@ function Deck({ set, cards }: { set: StudySet; cards: Card[] }) {
           </div>
         </>
       ) : (
-        <Done set={set} cards={cards} total={total} firstTry={total - missed.current.size} before={before.current} onAgain={restart} onLeave={leave} />
+        <DeckDone set={set} cards={cards} total={total} firstTry={total - missed.current.size} before={before.current} onAgain={restart} onLeave={leave} />
       )}
       <Shortcuts />
     </div>
@@ -305,51 +306,6 @@ function Face({ label, text, back, level }: { label: string; text: string; back:
         <span className={cx('card-text m-auto', label === 'term' && 'font-serif tracking-[-0.01em]')} style={{ fontSize: size }}>
           {text}
         </span>
-      </div>
-    </div>
-  );
-}
-
-function Done({ set, cards, total, firstTry, before, onAgain, onLeave }: { set: StudySet; cards: Card[]; total: number; firstTry: number; before: number; onAgain: () => void; onLeave: () => void }) {
-  const after = progress(cards, set.stats, Date.now()).mastery;
-  const gained = Math.round((after - before) * 100);
-  const share = total ? firstTry / total : 1;
-  // "Go again" takes the keyboard, so Enter starts another pass.
-  const again = useRef<HTMLButtonElement>(null);
-  useEffect(() => again.current?.focus(), []);
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-      <div className="m-auto flex w-full max-w-md flex-col items-center py-6 text-center">
-        <p className="enter label-mono text-muted">deck finished</p>
-        <h1 className="enter mt-2 font-serif text-[clamp(2.6rem,10vw,4rem)] leading-none tracking-[-0.01em] text-balance">{share === 1 ? 'Every card, first time.' : `${firstTry} of ${total} first time.`}</h1>
-        <div className="enter mt-9 flex items-center justify-center gap-8" style={{ '--i': 1 } as CSSProperties}>
-          <div className="flex flex-col items-center gap-2">
-            <Ring value={share} size={76} width={6}>
-              <Count value={share * 100} className="font-mono text-sm" />
-            </Ring>
-            <span className="label-mono text-muted">first time</span>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <Ring value={after} size={76} width={6}>
-              <Count value={after * 100} className="font-mono text-sm" />
-            </Ring>
-            <span className="label-mono text-muted">{gained > 0 ? `mastery +${gained}` : 'mastery'}</span>
-          </div>
-        </div>
-        <p className="enter mt-6 max-w-xs text-[14px] leading-relaxed text-pretty text-muted" style={{ '--i': 1 } as CSSProperties}>
-          {share === 1 ? 'Come back tomorrow: remembering after a break is what makes it stick.' : `The ${plural(total - firstTry, 'card')} you missed will come up first next time.`}
-        </p>
-        <div className="enter mt-8 flex flex-wrap justify-center gap-2.5" style={{ '--i': 2 } as CSSProperties}>
-          <Button ref={again} variant="primary" size="lg" onClick={onAgain}>
-            <Icon name="again" size={16} stroke={2} />
-            Go again
-            <Kbd on>↵</Kbd>
-          </Button>
-          <Button size="lg" onClick={onLeave}>
-            Done
-            <Kbd>Esc</Kbd>
-          </Button>
-        </div>
       </div>
     </div>
   );

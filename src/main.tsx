@@ -13,6 +13,7 @@ import './index.css';
 const Editor = lazy(() => import('./pages/Editor'));
 const Match = lazy(() => import('./pages/Match'));
 const Flashcards = lazy(() => import('./pages/Flashcards'));
+const Quiz = lazy(() => import('./pages/Quiz'));
 
 const router = createBrowserRouter([
   {
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
   // Study modes take the whole screen: no header around them.
   { path: 'set/:id/match', element: <Match /> },
   { path: 'set/:id/cards', element: <Flashcards /> },
+  { path: 'set/:id/quiz', element: <Quiz /> },
 ]);
 
 watchAppearance();

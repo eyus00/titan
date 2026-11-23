@@ -45,6 +45,7 @@ export default function SetView() {
   useHotkeys('This set', [
     { keys: ['m'], label: 'Play match', when: canMatch, run: () => navigate(`/set/${id}/match`) },
     { keys: ['f'], label: 'Flashcards', when: canFlip, run: () => navigate(`/set/${id}/cards`) },
+    { keys: ['q'], label: 'Quiz', when: canMatch, run: () => navigate(`/set/${id}/quiz`) },
     { keys: ['e'], label: 'Edit', when: !!set, run: () => navigate(`/set/${id}/edit`) },
     { keys: ['c'], label: 'Copy as text', when: !!set, run: () => void copy() },
     { keys: ['Escape'], label: 'Back to your sets', run: () => navigate('/') },
@@ -82,12 +83,15 @@ export default function SetView() {
         {best !== undefined && <> · best {formatDuration(best)}</>}
       </p>
 
-      <div ref={modes} className="enter mt-7 grid gap-3 sm:grid-cols-2" style={{ '--i': 1 } as CSSProperties}>
+      <div ref={modes} className="enter mt-7 grid gap-3 sm:grid-cols-3" style={{ '--i': 1 } as CSSProperties}>
         <Mode to={`/set/${set.id}/match`} icon="grid" title="Match" hint="M" enabled={canMatch}>
-          Pair terms with definitions against the clock, or keep going in an endless run.
+          Pair terms and definitions against the clock, or in an endless run.
         </Mode>
         <Mode to={`/set/${set.id}/cards`} icon="cards" title="Flashcards" hint="F" enabled={canFlip}>
-          Flip through the deck. The cards you miss come back until they stick.
+          Flip through the deck. Missed cards come back until they stick.
+        </Mode>
+        <Mode to={`/set/${set.id}/quiz`} icon="choice" title="Quiz" hint="Q" enabled={canMatch}>
+          Pick the right answer out of four. No clock, just recall.
         </Mode>
       </div>
       {!canMatch && <p className="mt-3 text-sm text-pretty text-muted">Add at least two cards with both a term and a definition to play.</p>}

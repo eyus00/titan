@@ -82,6 +82,12 @@ const ICONS = {
   star: <path d="M12 3l2.3 6.7L21 12l-6.7 2.3L12 21l-2.3-6.7L3 12l6.7-2.3z" />,
   shuffle: <path d="M4 7h3.5l9 10H20M4 17h3.5l9-10H20M17.5 4.5L20 7l-2.5 2.5M17.5 14.5L20 17l-2.5 2.5" />,
   chevron: <path d="M9.5 6l6 6-6 6" />,
+  choice: (
+    <>
+      <path d="M4.5 4.5h15v15h-15z" />
+      <path d="M9 9h6v6H9z" {...solid} />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof ICONS;

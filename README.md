@@ -1,8 +1,8 @@
 # Titan
 
 A study app for terminology. Paste a list of words and definitions, then match them against
-the clock or flip through them as cards. Titan keeps track of what you know and brings back
-what you miss.
+the clock, flip through them as cards or take a quiz. Titan keeps track of what you know and
+brings back what you miss.
 
 ```bash
 npm install
@@ -20,6 +20,8 @@ Needs Node 20.19 or newer.
   **endless** run that keeps dealing boards until you stop it.
 - **Flashcards**: flip, then mark each card as known or still learning (buttons, arrow keys or
   a drag). Missed cards come back a few cards later until they stick. Undo with `Z`.
+- **Quiz**: one question at a time, four answers to choose from (keys `1` to `4`). The card
+  you last confused the answer with is always among the choices.
 - **Cards never cut text off, and the board never scrolls.** Each card's text is set at the
   largest size that fits; rows with long definitions take height from rows of short terms. If
   the chosen cards still can't fit the screen, the longest are swapped for shorter ones, and
@@ -76,10 +78,11 @@ src/
     Editor.tsx          create and edit a set
     Match.tsx           the game: dealing, board, keyboard, result
     Flashcards.tsx      the deck: flip, grade, undo
+    Quiz.tsx            multiple choice
   components/
     Icon.tsx            the icon set (drawn for Titan, same language as the logo)
     Logo.tsx  Kbd.tsx  Button.tsx  Controls.tsx  Modal.tsx  Toast.tsx  Ring.tsx
-    ImportDialog.tsx  SettingsDialog.tsx  Shortcuts.tsx  Layout.tsx
+    ImportDialog.tsx  SettingsDialog.tsx  Shortcuts.tsx  Layout.tsx  DeckDone.tsx
   lib/
     store.ts            sets, settings, progress, activity (localStorage)
     learn.ts            the memory model and the choice of cards
